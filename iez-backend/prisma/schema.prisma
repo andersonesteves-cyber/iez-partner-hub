@@ -1,0 +1,30 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String    @id @default(uuid())
+  name                 String
+  email                String    @unique
+  passwordHash         String
+  companyName          String
+  
+  role                 String    @default("USER")
+  status               String    @default("PENDING")
+  requiredApprovalRole String
+  
+  approvedById         String?
+  approvedBy           User?     @relation("UserApprovals", fields: [approvedById], references: [id])
+  approvedUsers        User[]    @relation("UserApprovals")
+
+  resetToken           String?
+  resetTokenExpires    DateTime?
+
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
