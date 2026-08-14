@@ -1,29 +1,31 @@
-import DocumentosManager from '../components/DocumentosManager';
-import LinksUteis from '../components/LinksUteis';
+import DocumentosManager from '@/components/DocumentosManager';
 
-interface HomePageProps {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+// Tipagem oficial do Next.js para searchParams em Server Components
+interface HomeProps {
+  searchParams: {
+    q?: string;
+    categoria?: string;
+    [key: string]: string | string[] | undefined;
+  };
 }
 
-export default async function HomePage({ searchParams }: HomePageProps) {
-  const resolvedSearchParams = await searchParams;
-  const rawQuery = resolvedSearchParams.q;
-  const searchQuery = typeof rawQuery === 'string' ? rawQuery : '';
+export default function Home({ searchParams }: HomeProps) {
+  // Extrai os parâmetros da URL ou define vazio como fallback
+  const searchQuery = searchParams.q || '';
+  const categoria = searchParams.categoria || '';
 
   return (
-    <main className="flex-1 w-full h-full bg-gray-50 p-6 md:p-8 overflow-y-auto font-sans">
-      <div className="max-w-7xl mx-auto flex flex-col justify-between min-h-[calc(100vh-8rem)]">
+    <main className="flex-1 bg-gray-50 min-h-screen">
+      <div className="p-6 md:p-8">
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">
+          {categoria ? `Documentos: ${categoria}` : 'Todos os Documentos'}
+        </h1>
         
-        {/* Seção Principal: Documentos no Topo */}
-        <div>
-          <DocumentosManager searchQuery={searchQuery} />
-        </div>
-
-        {/* Seção de Atalhos: Posicionada na parte inferior da tela */}
-        <div className="mt-12 pt-6 border-t border-gray-200/60">
-          <LinksUteis />
-        </div>
-
+        {/* Agora o TypeScript reconhecerá essas props sem reclamar! */}
+        <DocumentosManager 
+          searchQuery={searchQuery} 
+          categoria={categoria} 
+        />
       </div>
     </main>
   );

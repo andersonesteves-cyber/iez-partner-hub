@@ -1,20 +1,26 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
-import Link from 'next/link'
-import NovoDocumentoModal from './NovoDocumentoModal'
+import { useState, useEffect } from 'react';
+// ... (mantenha seus outros imports aqui)
 
-interface Documento {
-  id: string
-  titulo: string
-  categoria: string
-  nivelAcesso: string
-  regraVisibilidade: string
-  empresa?: string
-  descricao?: string
-  arquivoUrl: String
-  criadoEm?: string
+// 1. Defina a interface dizendo ao TypeScript o que esse componente recebe
+interface DocumentosManagerProps {
+  searchQuery?: string;
+  categoria?: string;
+}
+
+// 2. Desestruture as props na função, já tipando com a interface criada
+export default function DocumentosManager({ 
+  searchQuery = '', 
+  categoria = '' 
+}: DocumentosManagerProps) {
+  
+  // ... (mantenha o restante do seu código intacto aqui para baixo)
+  // Agora você pode usar `searchQuery` e `categoria` livremente para filtrar seus estados
+  
+  return (
+    // ... seu JSX
+  );
 }
 
 // Fallback de dados locais caso a API na porta 5000 esteja indisponível
