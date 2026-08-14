@@ -1,193 +1,240 @@
-'use client';
+'use client'
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react'
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  companyName: string;
-  role: string;
-  status: string;
-  createdAt: string;
+interface Usuario {
+  id: string
+  nome: string
+  email: string
+  role: string
+  empresa: string
+  status: 'ATIVO' | 'PENDENTE' | 'BLOQUEADO'
+  criadoEm?: string
 }
 
-export default function UsuariosPage() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  
-  // Filtros
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'
 
-  const fetchUsers = async () => {
+export default function GestaoAcessosPage() {
+  const [usuarios, setUsuarios] = useState<Usuario[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busca, setBusca] = useState('')
+  const [filtroStatus, setFiltroStatus] = useState('TODOS')
+  const [filtroPerfil, setFiltroPerfil] = useState('TODOS')
+
+  // 1. Busca os usuários salvos no SQLite via API Node
+  const fetchUsuarios = async () => {
+    setLoading(true)
     try {
-      const res = await fetch('http://localhost:5000/api/users');
-      if (res.ok) {
-        const data = await res.json();
-        setUsers(data);
-      }
-    } catch (error) {
-      console.error('Erro ao buscar usuários:', error);
+      const res = await fetch(`${API_URL}/api/usuarios`)
+      if (!res.ok) throw new Error('Erro ao buscar usuários')
+      const data = await res.json()
+      setUsuarios(data)
+    } catch (err) {
+      console.error('Erro ao conectar com a API de usuários:', err)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    fetchUsuarios()
+  }, [])
 
-  const handleUpdateUser = async (id: string, updates: Partial<User>) => {
+  // 2. Atualiza o status do usuário (Aprovar / Bloquear / Ativar)
+  const handleAlterarStatus = async (id: string, novoStatus: 'ATIVO' | 'BLOQUEADO') => {
     try {
-      const res = await fetch(`http://localhost:5000/api/users/${id}`, {
-        method: 'PUT',
+      const res = await fetch(`${API_URL}/api/usuarios/${id}/status`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates),
-      });
+        body: JSON.stringify({ status: novoStatus }),
+      })
 
-      if (res.ok) {
-        setUsers(users.map((u) => (u.id === id ? { ...u, ...updates } : u)));
-      } else {
-        alert('Erro ao atualizar usuário.');
-      }
-    } catch (error) {
-      console.error('Erro na requisição:', error);
+      if (!res.ok) throw new Error('Erro ao atualizar status')
+
+      // Atualiza o estado local imediatamente
+      setUsuarios((prev) =>
+        prev.map((user) => (user.id === id ? { ...user, status: novoStatus } : user))
+      )
+    } catch (err) {
+      console.error('Erro ao alterar status:', err)
+      alert('Falha ao atualizar o status do usuário.')
     }
-  };
+  }
 
-  const filteredUsers = users.filter((user) => {
-    const searchLower = searchTerm.toLowerCase();
-    const matchesSearch = 
-      user.name.toLowerCase().includes(searchLower) ||
-      user.email.toLowerCase().includes(searchLower) ||
-      user.companyName.toLowerCase().includes(searchLower);
+  // 3. Aplica os filtros de busca, status e perfil
+  const usuariosFiltrados = usuarios.filter((u) => {
+    const termo = busca.toLowerCase()
+    const matchBusca =
+      u.nome.toLowerCase().includes(termo) ||
+      u.email.toLowerCase().includes(termo) ||
+      u.empresa.toLowerCase().includes(termo)
+
+    const matchStatus = filtroStatus === 'TODOS' || u.status === filtroStatus
     
-    const matchesStatus = statusFilter ? user.status === statusFilter : true;
-    const matchesRole = roleFilter ? user.role === roleFilter : true;
-    
-    return matchesSearch && matchesStatus && matchesRole;
-  });
+    const matchPerfil =
+      filtroPerfil === 'TODOS' ||
+      (filtroPerfil === 'ADMIN' && (u.role === 'ADMIN' || u.role === 'ADMIN_EMPRESA')) ||
+      (filtroPerfil === 'PARTNER' && u.role === 'PARTNER')
+
+    return matchBusca && matchStatus && matchPerfil
+  })
 
   return (
-    <main className="flex-1 w-full h-full bg-gray-50 p-6 md:p-8 overflow-y-auto font-sans">
-      <div className="max-w-7xl mx-auto">
-        
-        {/* Cabeçalho */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Gestão de Acessos</h1>
-          <p className="text-sm text-gray-500 mt-1">Aprove ou gerencie os perfis de usuários do portal.</p>
+    <div className="space-y-6">
+      {/* CABEÇALHO */}
+      <div className="pb-2 border-b border-gray-100">
+        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Gestão de Acessos</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Aprove ou gerencie os perfis de usuários do portal.
+        </p>
+      </div>
+
+      {/* BARRA DE FILTROS */}
+      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
+        <div className="relative w-full md:w-1/2">
+          <input
+            type="text"
+            placeholder="Buscar por nome, e-mail ou empresa..."
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white transition-all"
+          />
+          <svg className="w-4 h-4 text-gray-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
         </div>
 
-        {/* Barra de Filtros */}
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm mb-6 flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <input
-              type="text"
-              placeholder="Buscar por nome, e-mail ou empresa..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
-            />
-          </div>
-          <div className="flex gap-4">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="border border-gray-200 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white"
-            >
-              <option value="">Todos os Status</option>
-              <option value="PENDING">Pendentes</option>
-              <option value="APPROVED">Aprovados</option>
-              <option value="REJECTED">Reprovados</option>
-            </select>
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="border border-gray-200 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white"
-            >
-              <option value="">Todos os Perfis</option>
-              <option value="USER">Colaborador</option>
-              <option value="COMPANY_ADMIN">Admin Empresa</option>
-              <option value="IEZ_ADMIN">Admin iez!</option>
-            </select>
-          </div>
-        </div>
+        <div className="flex w-full md:w-auto gap-3">
+          <select
+            value={filtroStatus}
+            onChange={(e) => setFiltroStatus(e.target.value)}
+            className="w-1/2 md:w-auto px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 font-medium text-gray-700"
+          >
+            <option value="TODOS">Todos os Status</option>
+            <option value="PENDENTE">Pendentes</option>
+            <option value="ATIVO">Ativos</option>
+            <option value="BLOQUEADO">Bloqueados</option>
+          </select>
 
-        {/* Tabela de Usuários */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <select
+            value={filtroPerfil}
+            onChange={(e) => setFiltroPerfil(e.target.value)}
+            className="w-1/2 md:w-auto px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 font-medium text-gray-700"
+          >
+            <option value="TODOS">Todos os Perfis</option>
+            <option value="ADMIN">Administradores</option>
+            <option value="PARTNER">Parceiros</option>
+          </select>
+        </div>
+      </div>
+
+      {/* TABELA DE USUÁRIOS */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        {loading ? (
+          <div className="p-8 text-center text-gray-400">Carregando usuários...</div>
+        ) : usuariosFiltrados.length === 0 ? (
+          <div className="p-12 text-center text-gray-500">Nenhum usuário encontrado.</div>
+        ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
-                <tr>
-                  <th className="px-6 py-4 font-semibold">Usuário</th>
-                  <th className="px-6 py-4 font-semibold">Empresa</th>
-                  <th className="px-6 py-4 font-semibold">Perfil</th>
-                  <th className="px-6 py-4 font-semibold">Status</th>
-                  <th className="px-6 py-4 font-semibold text-right">Ações</th>
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <th className="py-3.5 px-4">Usuário</th>
+                  <th className="py-3.5 px-4">Empresa</th>
+                  <th className="py-3.5 px-4">Perfil</th>
+                  <th className="py-3.5 px-4">Status</th>
+                  <th className="py-3.5 px-4 text-right">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {loading ? (
-                  <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-500">Carregando usuários...</td></tr>
-                ) : filteredUsers.length === 0 ? (
-                  <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-500">Nenhum usuário encontrado.</td></tr>
-                ) : (
-                  filteredUsers.map((user) => (
-                    <tr key={user.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4">
-                        <p className="font-bold text-gray-900">{user.name}</p>
-                        <p className="text-xs text-gray-500">{user.email}</p>
-                      </td>
-                      <td className="px-6 py-4 text-gray-700">{user.companyName}</td>
-                      <td className="px-6 py-4">
-                        <select
-                          value={user.role}
-                          onChange={(e) => handleUpdateUser(user.id, { role: e.target.value })}
-                          className="text-xs border border-gray-200 rounded p-1 bg-white focus:outline-none focus:ring-1 focus:ring-orange-500"
-                        >
-                          <option value="USER">Colaborador</option>
-                          <option value="COMPANY_ADMIN">Admin Empresa</option>
-                          <option value="IEZ_ADMIN">Admin iez!</option>
-                        </select>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
-                          user.status === 'APPROVED' ? 'bg-green-100 text-green-700 border border-green-200' :
-                          user.status === 'REJECTED' ? 'bg-red-100 text-red-700 border border-red-200' :
-                          'bg-yellow-100 text-yellow-700 border border-yellow-200'
-                        }`}>
-                          {user.status === 'APPROVED' ? 'Aprovado' : user.status === 'REJECTED' ? 'Reprovado' : 'Pendente'}
+              <tbody className="divide-y divide-gray-100 text-sm">
+                {usuariosFiltrados.map((u) => (
+                  <tr key={u.id} className="hover:bg-gray-50/50 transition-colors">
+                    
+                    {/* USUÁRIO & EMAIL */}
+                    <td className="py-3.5 px-4">
+                      <p className="font-semibold text-gray-800">{u.nome}</p>
+                      <p className="text-xs text-gray-400">{u.email}</p>
+                    </td>
+
+                    {/* EMPRESA */}
+                    <td className="py-3.5 px-4 text-gray-600 font-medium">
+                      {u.empresa}
+                    </td>
+
+                    {/* PERFIL */}
+                    <td className="py-3.5 px-4">
+                      <span className="text-xs font-semibold px-2.5 py-1 bg-gray-100 text-gray-700 rounded-md">
+                        {u.role === 'ADMIN' ? 'ADMIN IEZ!' : u.role === 'ADMIN_EMPRESA' ? 'ADMIN PARCEIRO' : 'COLABORADOR'}
+                      </span>
+                    </td>
+
+                    {/* STATUS BADGE */}
+                    <td className="py-3.5 px-4">
+                      {u.status === 'ATIVO' && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                          Ativo
                         </span>
-                      </td>
-                      <td className="px-6 py-4 text-right space-x-2">
-                        {user.status !== 'APPROVED' && (
+                      )}
+                      {u.status === 'PENDENTE' && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 animate-pulse">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                          Aguardando Aprovação
+                        </span>
+                      )}
+                      {u.status === 'BLOQUEADO' && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                          Bloqueado
+                        </span>
+                      )}
+                    </td>
+
+                    {/* AÇÕES (APROVAR / BLOQUEAR) */}
+                    <td className="py-3.5 px-4 text-right space-x-2">
+                      {u.status === 'PENDENTE' && (
+                        <>
                           <button
-                            onClick={() => handleUpdateUser(user.id, { status: 'APPROVED' })}
-                            className="text-xs font-semibold text-green-600 hover:text-green-800 bg-green-50 px-3 py-1.5 rounded-md transition-colors"
+                            onClick={() => handleAlterarStatus(u.id, 'ATIVO')}
+                            className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-lg shadow-sm transition-all"
                           >
                             Aprovar
                           </button>
-                        )}
-                        {user.status !== 'REJECTED' && (
                           <button
-                            onClick={() => handleUpdateUser(user.id, { status: 'REJECTED' })}
-                            className="text-xs font-semibold text-red-600 hover:text-red-800 bg-red-50 px-3 py-1.5 rounded-md transition-colors"
+                            onClick={() => handleAlterarStatus(u.id, 'BLOQUEADO')}
+                            className="px-3 py-1.5 bg-white border border-gray-200 text-red-600 hover:bg-red-50 font-bold text-xs rounded-lg transition-all"
                           >
-                            Bloquear
+                            Recusar
                           </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
+                        </>
+                      )}
+
+                      {u.status === 'ATIVO' && u.role !== 'ADMIN' && (
+                        <button
+                          onClick={() => handleAlterarStatus(u.id, 'BLOQUEADO')}
+                          className="text-xs font-medium text-gray-400 hover:text-red-600 transition-colors"
+                        >
+                          Bloquear
+                        </button>
+                      )}
+
+                      {u.status === 'BLOQUEADO' && (
+                        <button
+                          onClick={() => handleAlterarStatus(u.id, 'ATIVO')}
+                          className="text-xs font-bold text-orange-600 hover:text-orange-700 transition-colors"
+                        >
+                          Reativar
+                        </button>
+                      )}
+                    </td>
+
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
-        </div>
-
+        )}
       </div>
-    </main>
-  );
+    </div>
+  )
 }
