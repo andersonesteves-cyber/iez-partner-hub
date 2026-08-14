@@ -7,24 +7,28 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id                   String    @id @default(uuid())
-  name                 String
-  email                String    @unique
-  passwordHash         String
-  companyName          String
-  
-  role                 String    @default("USER")
-  status               String    @default("PENDING")
-  requiredApprovalRole String
-  
-  approvedById         String?
-  approvedBy           User?     @relation("UserApprovals", fields: [approvedById], references: [id])
-  approvedUsers        User[]    @relation("UserApprovals")
+// TABELA DE DOCUMENTOS
+model Documento {
+  id                String   @id @default(uuid())
+  titulo            String
+  categoria         String
+  nivelAcesso       String   
+  regraVisibilidade String   
+  empresa           String?  
+  descricao         String?
+  arquivoUrl        String   
+  criadoEm          DateTime @default(now())
+  atualizadoEm      DateTime @updatedAt
+}
 
-  resetToken           String?
-  resetTokenExpires    DateTime?
-
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+// TABELA DE USUÁRIOS E GESTÃO DE ACESSOS
+model Usuario {
+  id        String   @id @default(uuid())
+  nome      String
+  email     String   @unique
+  senha     String
+  role      String   @default("PARTNER") // "ADMIN" ou "PARTNER"
+  empresa   String
+  status    String   @default("ATIVO")   // "ATIVO", "PENDENTE", "BLOQUEADO"
+  criadoEm  DateTime @default(now())
 }

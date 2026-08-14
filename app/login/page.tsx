@@ -3,6 +3,9 @@
 import { useState, FormEvent } from 'react';
 import Image from 'next/image';
 
+// Utiliza a variável de ambiente se existir, ou fallback para localhost
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
 export default function LoginPage() {
   // Alterna entre a visualização de Login e de Cadastro
   const [isRegistering, setIsRegistering] = useState(false);
@@ -19,7 +22,7 @@ export default function LoginPage() {
   const [role, setRole] = useState('USER'); // 'USER' = Colaborador, 'COMPANY_ADMIN' = Admin Empresa
 
   // ---------------------------------------------------------------------------
-  // FUNÇÃO DE LOGIN (COM A CORREÇÃO DO LOCALSTORAGE)
+  // FUNÇÃO DE LOGIN (COM TRATAMENTO DE ERROS E LOCALSTORAGE)
   // ---------------------------------------------------------------------------
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
@@ -27,7 +30,7 @@ export default function LoginPage() {
     setMessage(null);
 
     try {
-      const res = await fetch('http://localhost:5000/api/login', {
+      const res = await fetch(`${API_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -35,23 +38,28 @@ export default function LoginPage() {
 
       const data = await res.json().catch(() => null);
 
-      if (!res.ok) {
-        throw new Error(data?.message || 'E-mail ou senha inválidos. Tente novamente.');
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || data?.message || 'E-mail ou senha inválidos. Tente novamente.');
       }
 
       setMessage({ type: 'success', text: 'Login realizado! Redirecionando...' });
       
       // ========================================================
-      // SALVANDO OS DADOS NO NAVEGADOR PARA O HEADER LER!
+      // SALVANDO OS DADOS NO NAVEGADOR PARA O HEADER LER
       // ========================================================
-      localStorage.setItem('iez_token', data.token);
-      localStorage.setItem('iez_user', JSON.stringify(data.user));
+      if (data.user) {
+        localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('iez_partner_user', JSON.stringify(data.user));
+      }
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+      }
       
-      // Redireciona para a Home (isso vai recarregar a tela e o Header)
+      // Redireciona e recarrega a página para atualizar os contextos da aplicação
       window.location.href = '/';
     } catch (err: any) {
       const errorMsg = err.message === 'Failed to fetch' 
-        ? 'Servidor indisponível. Verifique se a API está rodando na porta 5000.' 
+        ? 'Servidor indisponível. Verifique se a API está rodando.' 
         : err.message;
       setMessage({ type: 'error', text: errorMsg });
     } finally {
@@ -68,7 +76,7 @@ export default function LoginPage() {
     setMessage(null);
 
     try {
-      const res = await fetch('http://localhost:5000/api/register', {
+      const res = await fetch(`${API_URL}/api/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password, company, role }),
@@ -77,7 +85,7 @@ export default function LoginPage() {
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        throw new Error(data?.message || 'Erro ao realizar cadastro.');
+        throw new Error(data?.error || data?.message || 'Erro ao realizar cadastro.');
       }
 
       setMessage({ type: 'success', text: 'Cadastro realizado com sucesso! Aguardando aprovação.' });
@@ -89,7 +97,7 @@ export default function LoginPage() {
       setRole('USER');
     } catch (err: any) {
       const errorMsg = err.message === 'Failed to fetch' 
-        ? 'Servidor indisponível. Verifique se a API está rodando na porta 5000.' 
+        ? 'Servidor indisponível. Verifique se a API está rodando.' 
         : err.message;
       setMessage({ type: 'error', text: errorMsg });
     } finally {
@@ -135,22 +143,22 @@ export default function LoginPage() {
         <form onSubmit={isRegistering ? handleRegister : handleLogin} className="space-y-4">
           
           {isRegistering && (
-            <>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Nome Completo *</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all"
-                  required
-                />
-              </div>
-            </>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Nome Completo *</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all"
+                required
+              />
+            </div>
           )}
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">E-mail corporativo {isRegistering && '*'}</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              E-mail corporativo {isRegistering && '*'}
+            </label>
             <input
               type="email"
               value={email}
@@ -175,7 +183,9 @@ export default function LoginPage() {
 
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-sm font-semibold text-gray-700">Senha {isRegistering && '*'}</label>
+              <label className="block text-sm font-semibold text-gray-700">
+                Senha {isRegistering && '*'}
+              </label>
               {!isRegistering && (
                 <button type="button" className="text-xs font-semibold text-orange-600 hover:text-orange-700">
                   Esqueceu a senha?
@@ -202,7 +212,9 @@ export default function LoginPage() {
                     role === 'USER' ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-orange-200'
                   }`}
                 >
-                  <span className={`text-sm font-bold ${role === 'USER' ? 'text-orange-800' : 'text-gray-700'}`}>Colaborador</span>
+                  <span className={`text-sm font-bold ${role === 'USER' ? 'text-orange-800' : 'text-gray-700'}`}>
+                    Colaborador
+                  </span>
                   <span className="text-xs text-gray-400 mt-1">Aprovação local</span>
                 </button>
                 <button
@@ -212,7 +224,9 @@ export default function LoginPage() {
                     role === 'COMPANY_ADMIN' ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-orange-200'
                   }`}
                 >
-                  <span className={`text-sm font-bold ${role === 'COMPANY_ADMIN' ? 'text-orange-800' : 'text-gray-700'}`}>Admin Empresa</span>
+                  <span className={`text-sm font-bold ${role === 'COMPANY_ADMIN' ? 'text-orange-800' : 'text-gray-700'}`}>
+                    Admin Empresa
+                  </span>
                   <span className="text-xs text-gray-400 mt-1">Aprovação iez!</span>
                 </button>
               </div>
@@ -224,7 +238,7 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-orange-600 hover:bg-orange-700 active:bg-orange-800 text-white font-bold py-3 px-4 rounded-lg transition-colors mt-6 disabled:opacity-70"
           >
-            {loading ? 'Aguarde...' : (isRegistering ? 'Finalizar Solicitação' : 'Entrar no Portal')}
+            {loading ? 'Aguarde...' : isRegistering ? 'Finalizar Solicitação' : 'Entrar no Portal'}
           </button>
         </form>
 
