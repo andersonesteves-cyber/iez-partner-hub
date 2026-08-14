@@ -3,9 +3,11 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql" // Mudamos de sqlite para postgresql
   url      = env("DATABASE_URL")
 }
+
+// ... (O resto das tabelas Documento e Usuario continua EXATAMENTE igual)
 
 // TABELA DE DOCUMENTOS
 model Documento {

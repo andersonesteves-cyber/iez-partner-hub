@@ -12,7 +12,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const prisma = new PrismaClient();
 
-// Configuração do Multer
+// Configuração do Multer (Uploads de Arquivos)
 const uploadDir = path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
@@ -67,13 +67,65 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'API do iez! Partner Hub operando 100% 🚀' });
 });
 
-// 2. ROTA DE LOGIN (Compatível com 'senha' e 'password')
+// 2. ROTA DE SOLICITAÇÃO DE CADASTRO (Novo)
+app.post('/api/register', async (req, res) => {
+  try {
+    const nome = req.body.name || req.body.nome;
+    const rawEmail = req.body.email || '';
+    const email = rawEmail.toLowerCase().trim();
+    const senha = req.body.password || req.body.senha;
+    const empresa = req.body.company || req.body.empresa;
+    const roleSolicitado = req.body.role || 'USER';
+
+    // Validação de campos obrigatórios
+    if (!nome || !email || !senha || !empresa) {
+      return res.status(400).json({ error: 'Todos os campos com * são obrigatórios.' });
+    }
+
+    // Verifica se o e-mail já está em uso
+    const usuarioExistente = await prisma.usuario.findUnique({
+      where: { email }
+    });
+
+    if (usuarioExistente) {
+      return res.status(400).json({ error: 'Este e-mail já está cadastrado no portal.' });
+    }
+
+    // Cria o novo parceiro com status PENDENTE
+    const novoUsuario = await prisma.usuario.create({
+      data: {
+        nome,
+        email,
+        senha,
+        empresa,
+        role: roleSolicitado === 'COMPANY_ADMIN' ? 'ADMIN_EMPRESA' : 'PARTNER',
+        status: 'PENDENTE' // Bloqueado até aprovação do ADMIN
+      }
+    });
+
+    console.log(`[IEZ! CADASTRO] Novo cadastro solicitado: ${email} (${empresa})`);
+
+    return res.status(201).json({
+      success: true,
+      message: 'Cadastro realizado com sucesso! Aguardando aprovação do administrador.',
+      user: {
+        id: novoUsuario.id,
+        nome: novoUsuario.nome,
+        email: novoUsuario.email,
+        status: novoUsuario.status
+      }
+    });
+  } catch (error) {
+    console.error('Erro no cadastro de usuário:', error);
+    res.status(500).json({ error: 'Erro interno ao processar a solicitação de cadastro.' });
+  }
+});
+
+// 3. ROTA DE LOGIN (Autenticação)
 app.post('/api/login', async (req, res) => {
   try {
     const rawEmail = req.body.email || '';
     const email = rawEmail.toLowerCase().trim();
-    
-    // Aceita tanto 'senha' quanto 'password' vindos do front-end
     const senhaForm = req.body.senha || req.body.password;
 
     if (!email || !senhaForm) {
@@ -88,6 +140,7 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ error: 'E-mail ou senha inválidos.' });
     }
 
+    // Bloqueia usuários pendentes
     if (usuario.status === 'PENDENTE') {
       return res.status(403).json({ error: 'Seu cadastro está aguardando aprovação do Admin.' });
     }
@@ -113,7 +166,7 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// 3. ROTA DE DOCUMENTOS (Listagem)
+// 4. ROTA DE DOCUMENTOS (Listagem)
 app.get('/api/documentos', async (req, res) => {
   try {
     const documentos = await prisma.documento.findMany({
@@ -125,7 +178,7 @@ app.get('/api/documentos', async (req, res) => {
   }
 });
 
-// 4. ROTA DE DOCUMENTOS (Cadastro)
+// 5. ROTA DE DOCUMENTOS (Cadastro)
 app.post('/api/documentos', upload.single('arquivo'), async (req, res) => {
   try {
     const { titulo, categoria, nivelAcesso, regraVisibilidade, empresa, descricao } = req.body;
@@ -153,7 +206,7 @@ app.post('/api/documentos', upload.single('arquivo'), async (req, res) => {
   }
 });
 
-// 5. GESTÃO DE ACESSOS: Listar Usuários
+// 6. GESTÃO DE ACESSOS: Listar Usuários
 app.get('/api/usuarios', async (req, res) => {
   try {
     const usuarios = await prisma.usuario.findMany({
@@ -165,11 +218,11 @@ app.get('/api/usuarios', async (req, res) => {
   }
 });
 
-// 6. GESTÃO DE ACESSOS: Aprovar/Bloquear Usuário
+// 7. GESTÃO DE ACESSOS: Aprovar/Bloquear Usuário
 app.patch('/api/usuarios/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status } = req.body; // 'ATIVO', 'PENDENTE' ou 'BLOQUEADO'
 
     const usuarioAtualizado = await prisma.usuario.update({
       where: { id },
@@ -182,7 +235,7 @@ app.patch('/api/usuarios/:id/status', async (req, res) => {
   }
 });
 
-// Inicialização e execução do Seed
+// Inicialização do Servidor
 app.listen(PORT, async () => {
   console.log(`[IEZ! BACKEND] Servidor rodando na porta ${PORT}`);
   await seedAdmin();
