@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { Suspense } from 'react'
 import Sidebar from '@/components/Sidebar'
-import Header from '@/components/Header'
+import Header from '@/components/TopHeader'
 import './globals.css'
 
 // Configuração da Fonte Inter (Identidade Visual da marca iez!)
