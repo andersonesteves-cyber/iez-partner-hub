@@ -1,10 +1,11 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import { Suspense } from 'react'
 import Sidebar from '@/components/Sidebar'
-import Header from '@/components/TopHeader'
+import Header from '@/components/Header'
 import './globals.css'
 
-// Configuração da Fonte Inter (Identidade Visual da marca)
+// Configuração da Fonte Inter (Identidade Visual da marca iez!)
 const inter = Inter({ subsets: ['latin'], display: 'swap' })
 
 export const metadata: Metadata = {
@@ -19,24 +20,26 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" className={inter.className}>
-      {/* 
-        bg-gray-50: Fundo padrão estilo dashboard limpo
-        overflow-x-hidden: Previne rolagem horizontal indesejada no mobile
-      */}
       <body className="bg-gray-50 text-gray-800 antialiased min-h-screen flex overflow-x-hidden">
         
-        {/* Barra Lateral de Navegação (Agora adaptada para Mobile/Desktop) */}
-        <Sidebar />
+        {/* Suspense em volta da Sidebar para contornar o uso do useSearchParams */}
+        <Suspense fallback={<div className="w-64 bg-white border-r h-screen hidden md:block" />}>
+          <Sidebar />
+        </Suspense>
 
         {/* Container Principal */}
         <div className="flex-1 flex flex-col min-w-0 w-full">
           
-          {/* Cabeçalho com barra de busca global */}
-          <Header />
+          {/* Suspense no Header também pelo mesmo motivo (barra de busca) */}
+          <Suspense fallback={<div className="h-16 bg-white border-b border-gray-200" />}>
+            <Header />
+          </Suspense>
 
-          {/* Conteúdo Dinâmico (onde as rotas renderizam) */}
+          {/* Conteúdo Dinâmico */}
           <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
-            {children}
+            <Suspense fallback={<div className="flex justify-center p-10 text-orange-500">Carregando portal...</div>}>
+              {children}
+            </Suspense>
           </main>
           
         </div>
