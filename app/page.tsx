@@ -1,5 +1,5 @@
-import DocumentosManager from './components/DocumentosManager';
-import LinksUteis from './components/LinksUteis';
+import DocumentosManager from '../components/DocumentosManager';
+import LinksUteis from '../components/LinksUteis';
 
 interface HomePageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
