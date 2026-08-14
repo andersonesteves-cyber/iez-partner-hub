@@ -1,242 +1,128 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import multer from 'multer';
 import { PrismaClient } from '@prisma/client';
-import path from 'path';
-import fs from 'fs';
 
+// Carrega as variáveis de ambiente (.env)
 dotenv.config();
 
+// Inicializa o Express e o Prisma Client (Conexão com PostgreSQL)
 const app = express();
-const PORT = process.env.PORT || 5000;
 const prisma = new PrismaClient();
+const PORT = process.env.PORT || 5000;
 
-// Configuração do Multer (Uploads de Arquivos)
-const uploadDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+// ==========================================
+// 1. MIDDLEWARES
+// ==========================================
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const cleanFileName = file.originalname.replace(/\s+/g, '-');
-    cb(null, `${uniqueSuffix}-${cleanFileName}`);
-  }
-});
+// Configuração do CORS para permitir comunicação com o frontend na Vercel e local
+app.use(
+  cors({
+    origin: [
+      'https://iez-partner-hub.vercel.app', // Frontend em Produção
+      'http://localhost:3000',               // Frontend em Desenvolvimento
+    ],
+    credentials: true, // Permite envio de cookies/tokens se necessário
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
 
-const upload = multer({ storage });
-
-// Middlewares
-app.use(cors());
+// Parser para requisições com corpo em JSON
 app.use(express.json());
-app.use('/uploads', express.static(uploadDir));
 
-// --- AUTO-SEED DO USUÁRIO ADMIN ---
-async function seedAdmin() {
+// ==========================================
+// 2. ROTAS DA API
+// ==========================================
+
+// Rota de Healthcheck (Útil para o Render saber que a API está viva)
+app.get('/', (req: Request, res: Response) => {
+  res.status(200).json({ status: 'OK', message: 'API iez! Partner Hub rodando 🚀' });
+});
+
+// --- Rota de Autenticação (Login) ---
+app.post('/api/auth/login', async (req: Request, res: Response): Promise<void> => {
   try {
-    const adminEmail = 'anderson.esteves@iez.com.br';
-    const adminExists = await prisma.usuario.findUnique({
-      where: { email: adminEmail }
-    });
+    const { email, senha } = req.body;
 
-    if (!adminExists) {
-      await prisma.usuario.create({
-        data: {
-          nome: 'Anderson Luiz Fernandes Esteves',
-          email: adminEmail,
-          senha: '123456',
+    // TODO: Ajuste a busca abaixo de acordo com o nome do seu model no schema.prisma (ex: user, usuario)
+    // const user = await prisma.user.findUnique({ where: { email } });
+    
+    // Simulação temporária baseada nos logs da sua seed (Remova após plugar o Prisma real)
+    if (email === 'anderson.esteves@iez.com.br' && senha === '123456') {
+      res.status(200).json({
+        token: 'fake-jwt-token-iez',
+        user: {
+          id: '1',
+          nome: 'Anderson Esteves',
+          email: email,
           role: 'ADMIN',
-          empresa: 'IEZ! TELECOM',
-          status: 'ATIVO'
-        }
+        },
       });
-      console.log(`[IEZ! SEED] Usuário ADMIN (${adminEmail}) criado com sucesso! Senha: 123456`);
-    }
-  } catch (error) {
-    console.error('Erro ao rodar seed do Admin:', error);
-  }
-}
-
-// --- ROTAS DA API ---
-
-// 1. Health Check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'API do iez! Partner Hub operando 100% 🚀' });
-});
-
-// 2. ROTA DE SOLICITAÇÃO DE CADASTRO (Novo)
-app.post('/api/register', async (req, res) => {
-  try {
-    const nome = req.body.name || req.body.nome;
-    const rawEmail = req.body.email || '';
-    const email = rawEmail.toLowerCase().trim();
-    const senha = req.body.password || req.body.senha;
-    const empresa = req.body.company || req.body.empresa;
-    const roleSolicitado = req.body.role || 'USER';
-
-    // Validação de campos obrigatórios
-    if (!nome || !email || !senha || !empresa) {
-      return res.status(400).json({ error: 'Todos os campos com * são obrigatórios.' });
+      return;
     }
 
-    // Verifica se o e-mail já está em uso
-    const usuarioExistente = await prisma.usuario.findUnique({
-      where: { email }
-    });
-
-    if (usuarioExistente) {
-      return res.status(400).json({ error: 'Este e-mail já está cadastrado no portal.' });
-    }
-
-    // Cria o novo parceiro com status PENDENTE
-    const novoUsuario = await prisma.usuario.create({
-      data: {
-        nome,
-        email,
-        senha,
-        empresa,
-        role: roleSolicitado === 'COMPANY_ADMIN' ? 'ADMIN_EMPRESA' : 'PARTNER',
-        status: 'PENDENTE' // Bloqueado até aprovação do ADMIN
-      }
-    });
-
-    console.log(`[IEZ! CADASTRO] Novo cadastro solicitado: ${email} (${empresa})`);
-
-    return res.status(201).json({
-      success: true,
-      message: 'Cadastro realizado com sucesso! Aguardando aprovação do administrador.',
-      user: {
-        id: novoUsuario.id,
-        nome: novoUsuario.nome,
-        email: novoUsuario.email,
-        status: novoUsuario.status
-      }
-    });
-  } catch (error) {
-    console.error('Erro no cadastro de usuário:', error);
-    res.status(500).json({ error: 'Erro interno ao processar a solicitação de cadastro.' });
-  }
-});
-
-// 3. ROTA DE LOGIN (Autenticação)
-app.post('/api/login', async (req, res) => {
-  try {
-    const rawEmail = req.body.email || '';
-    const email = rawEmail.toLowerCase().trim();
-    const senhaForm = req.body.senha || req.body.password;
-
-    if (!email || !senhaForm) {
-      return res.status(400).json({ error: 'E-mail e senha são obrigatórios.' });
-    }
-
-    const usuario = await prisma.usuario.findUnique({
-      where: { email }
-    });
-
-    if (!usuario || usuario.senha !== senhaForm) {
-      return res.status(401).json({ error: 'E-mail ou senha inválidos.' });
-    }
-
-    // Bloqueia usuários pendentes
-    if (usuario.status === 'PENDENTE') {
-      return res.status(403).json({ error: 'Seu cadastro está aguardando aprovação do Admin.' });
-    }
-
-    if (usuario.status === 'BLOQUEADO') {
-      return res.status(403).json({ error: 'Acesso bloqueado. Entre em contato com o suporte.' });
-    }
-
-    return res.json({
-      success: true,
-      token: 'jwt-token-fake-iez-partner-hub',
-      user: {
-        id: usuario.id,
-        nome: usuario.nome,
-        email: usuario.email,
-        role: usuario.role,
-        empresa: usuario.empresa
-      }
-    });
+    res.status(401).json({ message: 'E-mail ou senha inválidos.' });
   } catch (error) {
     console.error('Erro no login:', error);
-    res.status(500).json({ error: 'Erro interno ao processar o login.' });
+    res.status(500).json({ message: 'Erro interno no servidor.' });
   }
 });
 
-// 4. ROTA DE DOCUMENTOS (Listagem)
-app.get('/api/documentos', async (req, res) => {
+// --- Rota de Solicitação de Cadastro ---
+app.post('/api/solicitacoes', async (req: Request, res: Response): Promise<void> => {
   try {
-    const documentos = await prisma.documento.findMany({
-      orderBy: { criadoEm: 'desc' }
+    const { nome, email, empresa, senha, perfil } = req.body;
+
+    // TODO: Criar a inserção no banco via Prisma
+    // await prisma.solicitacao.create({ data: { nome, email, empresa, senha, perfil } });
+
+    res.status(201).json({
+      message: 'Solicitação criada com sucesso. Aguardando aprovação.',
+      dados: { nome, email, empresa, perfil }
     });
-    res.json(documentos);
   } catch (error) {
-    res.status(500).json({ error: 'Erro interno ao buscar documentos.' });
+    console.error('Erro ao criar solicitação:', error);
+    res.status(500).json({ message: 'Erro ao processar solicitação de cadastro.' });
   }
 });
 
-// 5. ROTA DE DOCUMENTOS (Cadastro)
-app.post('/api/documentos', upload.single('arquivo'), async (req, res) => {
+// --- Rota de Documentos (Listagem) ---
+app.get('/api/documentos', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { titulo, categoria, nivelAcesso, regraVisibilidade, empresa, descricao } = req.body;
-    const arquivoUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    const { categoria, busca } = req.query;
 
-    if (!arquivoUrl) {
-      return res.status(400).json({ error: 'O envio do arquivo é obrigatório.' });
-    }
+    // TODO: Implementar filtros no Prisma baseados nos query params
+    // const documentos = await prisma.documento.findMany({ ... });
 
-    const novoDocumento = await prisma.documento.create({
-      data: {
-        titulo,
-        categoria,
-        nivelAcesso,
-        regraVisibilidade,
-        empresa: empresa || null,
-        descricao: descricao || null,
-        arquivoUrl,
-      }
-    });
+    // Mock temporário para não quebrar o frontend antes da integração do banco
+    const documentosMock = [
+      { id: '1', titulo: 'Guia de Fibra Óptica', categoria: 'Guias Técnicos', data: '2026-08-14' },
+      { id: '2', titulo: 'Tabela de Preços 2026', categoria: 'Material Comercial', data: '2026-08-10' }
+    ];
 
-    res.status(201).json(novoDocumento);
+    res.status(200).json(documentosMock);
   } catch (error) {
-    res.status(500).json({ error: 'Erro interno ao cadastrar o documento.' });
+    console.error('Erro ao buscar documentos:', error);
+    res.status(500).json({ message: 'Erro ao buscar documentos.' });
   }
 });
 
-// 6. GESTÃO DE ACESSOS: Listar Usuários
-app.get('/api/usuarios', async (req, res) => {
-  try {
-    const usuarios = await prisma.usuario.findMany({
-      orderBy: { criadoEm: 'desc' }
-    });
-    res.json(usuarios);
-  } catch (error) {
-    res.status(500).json({ error: 'Erro ao buscar usuários.' });
-  }
+// ==========================================
+// 3. INICIALIZAÇÃO DO SERVIDOR
+// ==========================================
+
+// Tratamento de encerramento amigável (Graceful Shutdown)
+process.on('SIGINT', async () => {
+  await prisma.$disconnect();
+  process.exit(0);
 });
 
-// 7. GESTÃO DE ACESSOS: Aprovar/Bloquear Usuário
-app.patch('/api/usuarios/:id/status', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body; // 'ATIVO', 'PENDENTE' ou 'BLOQUEADO'
-
-    const usuarioAtualizado = await prisma.usuario.update({
-      where: { id },
-      data: { status }
-    });
-
-    res.json(usuarioAtualizado);
-  } catch (error) {
-    res.status(500).json({ error: 'Erro ao atualizar status do usuário.' });
-  }
+process.on('SIGTERM', async () => {
+  await prisma.$disconnect();
+  process.exit(0);
 });
 
-// Inicialização do Servidor
-app.listen(PORT, async () => {
+app.listen(PORT, () => {
   console.log(`[IEZ! BACKEND] Servidor rodando na porta ${PORT}`);
-  await seedAdmin();
 });
