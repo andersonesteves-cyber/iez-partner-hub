@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "ES2017",
+    "target": "es5",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
@@ -18,18 +18,11 @@
         "name": "next"
       }
     ],
-    "paths": {
-      {
-  "compilerOptions": {
-    // ... outras configurações que já estão aí ...
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"]
     }
-  }
-}
-    }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "iez-backend", "iez-backend/**/*"]
+  "exclude": ["node_modules"]
 }
