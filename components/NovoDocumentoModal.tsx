@@ -1,262 +1,246 @@
-'use client';
+'use client'
 
-import { useState, ChangeEvent, FormEvent } from 'react';
-import { X, Upload, CheckCircle2 } from 'lucide-react';
+import { useState } from 'react'
 
 interface NovoDocumentoModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSave: (novoDoc: any) => void;
+  isOpen: boolean
+  onClose: () => void
+  // onSave: (doc: any) => void // Descomente quando integrar a prop de salvamento
 }
 
-export default function NovoDocumentoModal({
-  isOpen,
-  onClose,
-  onSave,
-}: NovoDocumentoModalProps) {
-  const [titulo, setTitulo] = useState('');
-  const [categoria, setCategoria] = useState('Onboarding');
-  const [nivelAcesso, setNivelAcesso] = useState('Partner (Todos)');
-  const [visibilidade, setVisibilidade] = useState<'publica' | 'restrita'>('publica');
-  const [empresaId, setEmpresaId] = useState('');
-  const [descricao, setDescricao] = useState('');
-  const [arquivo, setArquivo] = useState<File | null>(null);
+export default function NovoDocumentoModal({ isOpen, onClose }: NovoDocumentoModalProps) {
+  // Estados para simular os dados que virão da API Node.js futuramente
+  const [categorias, setCategorias] = useState(['Marketing', 'Onboarding', 'Processos'])
+  const [empresas, setEmpresas] = useState(['Telecom Sul Ltda', 'Alpha Conectividade', 'Beta Soluções de Rede'])
 
-  if (!isOpen) return null;
+  // Estados de Toggle para Modo Criação Inline
+  const [isAddingCategoria, setIsAddingCategoria] = useState(false)
+  const [isAddingEmpresa, setIsAddingEmpresa] = useState(false)
 
-  // Trata a seleção do arquivo
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setArquivo(e.target.files[0]);
-    }
-  };
+  // Estados dos valores do formulário
+  const [formData, setFormData] = useState({
+    titulo: '',
+    categoria: categorias[0],
+    novaCategoria: '',
+    nivelAcesso: 'Partner (Todos)',
+    regraVisibilidade: 'Restrita a uma Empresa',
+    empresa: '',
+    novaEmpresa: '',
+    descricao: ''
+  })
 
-  const handleResetAndClose = () => {
-    setTitulo('');
-    setCategoria('Onboarding');
-    setNivelAcesso('Partner (Todos)');
-    setVisibilidade('publica');
-    setEmpresaId('');
-    setDescricao('');
-    setArquivo(null);
-    onClose();
-  };
+  if (!isOpen) return null
 
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    // Lógica para definir qual valor será salvo (o selecionado ou o recém-criado)
+    const categoriaFinal = isAddingCategoria ? formData.novaCategoria : formData.categoria
+    const empresaFinal = isAddingEmpresa ? formData.novaEmpresa : formData.empresa
 
-    if (!arquivo) {
-      alert('Por favor, selecione um arquivo para upload.');
-      return;
+    const novoDocumento = {
+      ...formData,
+      categoria: categoriaFinal,
+      empresa: empresaFinal,
     }
 
-    // Estrutura do objeto para atualização de estado em tempo real
-    const novoDoc = {
-      id: Date.now().toString(),
-      titulo,
-      categoria,
-      nivelAcesso,
-      visibilidade,
-      empresaId: visibilidade === 'restrita' ? empresaId : null,
-      descricao,
-      nomeArquivo: arquivo.name,
-      tamanhoArquivo: `${(arquivo.size / 1024).toFixed(0)} KB`,
-      dataUpload: new Date().toLocaleDateString('pt-BR'),
-      tipo: arquivo.type.includes('pdf') ? 'PDF' : 'Documento',
-    };
-
-    onSave(novoDoc);
-    handleResetAndClose();
-  };
+    console.log('Salvando documento:', novoDocumento)
+    
+    // Aqui você chamaria o onSave(novoDocumento) e a API do Node
+    // onSave(novoDocumento)
+    onClose()
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto font-sans">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 relative my-8 animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
         
-        {/* Cabeçalho */}
-        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-          <h2 className="text-base font-bold text-gray-800">Cadastrar Novo Documento</h2>
-          <button
-            type="button"
-            onClick={handleResetAndClose}
-            className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            <X size={18} />
+        {/* HEADER DO MODAL */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="text-lg font-semibold text-gray-800">Cadastrar Novo Documento</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4 text-left">
+        {/* CORPO DO FORMULÁRIO */}
+        <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-6 space-y-5">
           
           {/* Título */}
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Título do Documento <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               required
-              placeholder="Ex: Manual de Vendas Fibra 2026"
-              value={titulo}
-              onChange={(e) => setTitulo(e.target.value)}
-              className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+              placeholder="Ex: Plano e Ofertas"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
+              value={formData.titulo}
+              onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
             />
           </div>
 
-          {/* Categoria e Nível de Acesso */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Categoria com Inline Creation */}
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Categoria
-              </label>
-              <select
-                value={categoria}
-                onChange={(e) => setCategoria(e.target.value)}
-                className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
-              >
-                <option value="Onboarding">Onboarding</option>
-                <option value="Processos">Processos</option>
-                <option value="Marketing">Marketing</option>
-              </select>
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-sm font-medium text-gray-700">Categoria</label>
+                <button 
+                  type="button" 
+                  onClick={() => setIsAddingCategoria(!isAddingCategoria)}
+                  className="text-xs font-semibold text-orange-600 hover:text-orange-700"
+                >
+                  {isAddingCategoria ? 'Cancelar' : '+ Nova Categoria'}
+                </button>
+              </div>
+              
+              {isAddingCategoria ? (
+                <input
+                  type="text"
+                  required
+                  placeholder="Digite o nome da nova categoria"
+                  className="w-full px-3 py-2 border border-orange-300 bg-orange-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
+                  value={formData.novaCategoria}
+                  onChange={(e) => setFormData({ ...formData, novaCategoria: e.target.value })}
+                />
+              ) : (
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm bg-white"
+                  value={formData.categoria}
+                  onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
+                >
+                  {categorias.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                </select>
+              )}
             </div>
 
+            {/* Nível de Acesso */}
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Nível de Acesso
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nível de Acesso</label>
               <select
-                value={nivelAcesso}
-                onChange={(e) => setNivelAcesso(e.target.value)}
-                className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm bg-white"
+                value={formData.nivelAcesso}
+                onChange={(e) => setFormData({ ...formData, nivelAcesso: e.target.value })}
               >
                 <option value="Partner (Todos)">Partner (Todos)</option>
-                <option value="Master Partner">Master Partner</option>
-                <option value="Apenas Admin">Apenas Admin</option>
+                <option value="Admin">Admin</option>
               </select>
             </div>
           </div>
 
-          {/* Visibilidade por Empresa */}
-          <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
-            <label className="block text-xs font-semibold text-gray-700">
-              Regra de Visibilidade por Empresa
-            </label>
-            <div className="flex items-center gap-4 text-xs">
-              <label className="flex items-center gap-1.5 cursor-pointer text-gray-700">
+          {/* Regra de Visibilidade */}
+          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+            <p className="text-sm font-medium text-gray-700 mb-3">Regra de Visibilidade por Empresa</p>
+            <div className="flex items-center space-x-4 mb-4">
+              <label className="flex items-center text-sm text-gray-600">
                 <input
                   type="radio"
                   name="visibilidade"
-                  value="publica"
-                  checked={visibilidade === 'publica'}
-                  onChange={() => setVisibilidade('publica')}
-                  className="text-orange-600 focus:ring-orange-500 accent-orange-600"
+                  className="text-orange-600 focus:ring-orange-500 mr-2"
+                  checked={formData.regraVisibilidade === 'Pública'}
+                  onChange={() => setFormData({ ...formData, regraVisibilidade: 'Pública' })}
                 />
                 Pública (Todas as empresas)
               </label>
-              <label className="flex items-center gap-1.5 cursor-pointer text-gray-700">
+              <label className="flex items-center text-sm text-gray-600">
                 <input
                   type="radio"
                   name="visibilidade"
-                  value="restrita"
-                  checked={visibilidade === 'restrita'}
-                  onChange={() => setVisibilidade('restrita')}
-                  className="text-orange-600 focus:ring-orange-500 accent-orange-600"
+                  className="text-orange-600 focus:ring-orange-500 mr-2"
+                  checked={formData.regraVisibilidade === 'Restrita a uma Empresa'}
+                  onChange={() => setFormData({ ...formData, regraVisibilidade: 'Restrita a uma Empresa' })}
                 />
                 Restrita a uma Empresa
               </label>
             </div>
 
-            {/* Select dinâmico exibido apenas quando 'restrita' é selecionada */}
-            {visibilidade === 'restrita' && (
-              <div className="pt-2 animate-in fade-in duration-200">
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Selecione a Empresa Parceira <span className="text-red-500">*</span>
-                </label>
-                <select
-                  required
-                  value={empresaId}
-                  onChange={(e) => setEmpresaId(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
-                >
-                  <option value="">Selecione uma empresa...</option>
-                  <option value="emp-1"> Telecom Sul Ltda</option>
-                  <option value="emp-2"> Alpha Conectividade</option>
-                  <option value="emp-3"> Beta Soluções de Rede</option>
-                </select>
+            {/* Empresa com Inline Creation (Exibida apenas se for restrita) */}
+            {formData.regraVisibilidade === 'Restrita a uma Empresa' && (
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-sm font-medium text-gray-700">
+                    Selecione a Empresa Parceira <span className="text-red-500">*</span>
+                  </label>
+                  <button 
+                    type="button" 
+                    onClick={() => setIsAddingEmpresa(!isAddingEmpresa)}
+                    className="text-xs font-semibold text-orange-600 hover:text-orange-700"
+                  >
+                    {isAddingEmpresa ? 'Cancelar' : '+ Nova Empresa'}
+                  </button>
+                </div>
+
+                {isAddingEmpresa ? (
+                  <input
+                    type="text"
+                    required
+                    placeholder="Digite o nome da nova empresa"
+                    className="w-full px-3 py-2 border border-orange-300 bg-orange-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
+                    value={formData.novaEmpresa}
+                    onChange={(e) => setFormData({ ...formData, novaEmpresa: e.target.value })}
+                  />
+                ) : (
+                  <select
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm bg-white"
+                    value={formData.empresa}
+                    onChange={(e) => setFormData({ ...formData, empresa: e.target.value })}
+                  >
+                    <option value="">Selecione uma empresa...</option>
+                    {empresas.map(emp => <option key={emp} value={emp}>{emp}</option>)}
+                  </select>
+                )}
               </div>
             )}
           </div>
 
-          {/* UPLOAD DE ARQUIVO */}
+          {/* Upload de Arquivo (Área visual por enquanto) */}
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Upload do Arquivo <span className="text-red-500">*</span>
             </label>
-            <div className="relative border-2 border-dashed border-gray-300 hover:border-orange-500 bg-gray-50 hover:bg-orange-50/40 rounded-lg p-4 text-center cursor-pointer transition-all group">
-              <input
-                type="file"
-                required
-                onChange={handleFileChange}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.mp4"
-              />
-              <div className="flex flex-col items-center justify-center gap-1">
-                {arquivo ? (
-                  <>
-                    <CheckCircle2 size={24} className="text-orange-600" />
-                    <span className="text-xs font-semibold text-gray-800 break-all px-2">
-                      {arquivo.name}
-                    </span>
-                    <span className="text-[10px] text-gray-500">
-                      {(arquivo.size / (1024 * 1024)).toFixed(2)} MB — Clique para alterar
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <Upload size={22} className="text-orange-500 group-hover:scale-110 transition-transform" />
-                    <span className="text-xs text-gray-700 font-medium">
-                      Clique ou arraste um arquivo até aqui
-                    </span>
-                    <span className="text-[10px] text-gray-400">
-                      PDF, DOCX, PPT, MP4 (Tamanho máx.: 50MB)
-                    </span>
-                  </>
-                )}
-              </div>
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center text-center hover:bg-gray-50 transition-colors cursor-pointer group">
+              <svg className="w-8 h-8 text-orange-500 mb-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              <p className="text-sm font-medium text-gray-700">Clique ou arraste um arquivo até aqui</p>
+              <p className="text-xs text-gray-400 mt-1">PDF, DOCX, PPT, MP4 (Tamanho máx.: 50MB)</p>
             </div>
           </div>
 
           {/* Descrição */}
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">
-              Descrição
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
             <textarea
               rows={3}
               placeholder="Forneça detalhes sobre o conteúdo deste arquivo..."
-              value={descricao}
-              onChange={(e) => setDescricao(e.target.value)}
-              className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all resize-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm resize-none"
+              value={formData.descricao}
+              onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
             />
           </div>
-
-          {/* Botões de Ação */}
-          <div className="flex items-center justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={handleResetAndClose}
-              className="px-4 py-2 text-xs font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 active:bg-orange-800 rounded-lg shadow-sm transition-colors"
-            >
-              Cadastrar Documento
-            </button>
-          </div>
         </form>
+
+        {/* FOOTER DO MODAL */}
+        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end space-x-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSave}
+            type="submit"
+            className="px-4 py-2 text-sm font-medium text-white bg-orange-600 border border-transparent rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 shadow-sm"
+          >
+            Cadastrar Documento
+          </button>
+        </div>
       </div>
     </div>
-  );
+  )
 }
