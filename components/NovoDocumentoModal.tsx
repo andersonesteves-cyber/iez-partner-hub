@@ -5,19 +5,16 @@ import { useState } from 'react'
 interface NovoDocumentoModalProps {
   isOpen: boolean
   onClose: () => void
-  // onSave: (doc: any) => void // Descomente quando integrar a prop de salvamento
+  onSave: (doc: any) => void // <-- Tipagem corrigida e ativada
 }
 
-export default function NovoDocumentoModal({ isOpen, onClose }: NovoDocumentoModalProps) {
-  // Estados para simular os dados que virão da API Node.js futuramente
+export default function NovoDocumentoModal({ isOpen, onClose, onSave }: NovoDocumentoModalProps) {
   const [categorias, setCategorias] = useState(['Marketing', 'Onboarding', 'Processos'])
   const [empresas, setEmpresas] = useState(['Telecom Sul Ltda', 'Alpha Conectividade', 'Beta Soluções de Rede'])
 
-  // Estados de Toggle para Modo Criação Inline
   const [isAddingCategoria, setIsAddingCategoria] = useState(false)
   const [isAddingEmpresa, setIsAddingEmpresa] = useState(false)
 
-  // Estados dos valores do formulário
   const [formData, setFormData] = useState({
     titulo: '',
     categoria: categorias[0],
@@ -34,20 +31,22 @@ export default function NovoDocumentoModal({ isOpen, onClose }: NovoDocumentoMod
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault()
     
-    // Lógica para definir qual valor será salvo (o selecionado ou o recém-criado)
     const categoriaFinal = isAddingCategoria ? formData.novaCategoria : formData.categoria
     const empresaFinal = isAddingEmpresa ? formData.novaEmpresa : formData.empresa
 
+    // Montamos o objeto do novo documento (incluindo dados mockados para exibição imediata)
     const novoDocumento = {
       ...formData,
+      id: Date.now().toString(), // ID provisório até termos o banco
+      data: new Date().toLocaleDateString('pt-BR'),
       categoria: categoriaFinal,
       empresa: empresaFinal,
     }
 
     console.log('Salvando documento:', novoDocumento)
     
-    // Aqui você chamaria o onSave(novoDocumento) e a API do Node
-    // onSave(novoDocumento)
+    // Dispara a função passada pelo DocumentosManager
+    onSave(novoDocumento)
     onClose()
   }
 
@@ -157,7 +156,7 @@ export default function NovoDocumentoModal({ isOpen, onClose }: NovoDocumentoMod
               </label>
             </div>
 
-            {/* Empresa com Inline Creation (Exibida apenas se for restrita) */}
+            {/* Empresa com Inline Creation */}
             {formData.regraVisibilidade === 'Restrita a uma Empresa' && (
               <div>
                 <div className="flex justify-between items-center mb-1">
@@ -196,7 +195,7 @@ export default function NovoDocumentoModal({ isOpen, onClose }: NovoDocumentoMod
             )}
           </div>
 
-          {/* Upload de Arquivo (Área visual por enquanto) */}
+          {/* Upload de Arquivo */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Upload do Arquivo <span className="text-red-500">*</span>
