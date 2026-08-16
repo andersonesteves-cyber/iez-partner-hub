@@ -20,7 +20,11 @@ export default function SolicitarAcessoForm() {
     setErro('');
     setCarregando(true);
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+// APAGA ESTA LINHA:
+// const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
+// E COLOCA ESTA NO LUGAR:
+const API_URL = 'https://api-iez-partner-hub.onrender.com';
 
     try {
       const res = await fetch(`${API_URL}/api/solicitacoes`, {

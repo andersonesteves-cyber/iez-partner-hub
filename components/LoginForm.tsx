@@ -15,8 +15,11 @@ export default function LoginForm() {
     setErro('');
     setCarregando(true);
 
-    // Obtém a URL da API da variável de ambiente (Vercel) ou usa localhost
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  // APAGA ESTA LINHA:
+// const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
+// E COLOCA ESTA NO LUGAR:
+const API_URL = 'https://api-iez-partner-hub.onrender.com';
 
     try {
       const res = await fetch(`${API_URL}/api/auth/login`, {
