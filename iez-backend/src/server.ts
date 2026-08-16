@@ -178,7 +178,55 @@ app.put('/api/documentos/:id', async (req: Request, res: Response): Promise<void
     res.status(500).json({ message: 'Erro ao atualizar o documento.' });
   }
 });
+// --- Rota de Gestão de Acessos (Listar Usuários) ---
+app.get('/api/usuarios', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const usuarios = await prisma.usuario.findMany({
+      orderBy: [
+        { status: 'asc' }, // Traz os PENDENTES primeiro (ordem alfabética: ATIVO, BLOQUEADO, PENDENTE... na verdade PENDENTE vai pro final, vamos ordenar por criadoEm)
+        { criadoEm: 'desc' }
+      ],
+      select: {
+        id: true,
+        nome: true,
+        email: true,
+        role: true,
+        empresa: true,
+        status: true,
+        criadoEm: true
+      }
+    });
 
+    res.status(200).json(usuarios);
+  } catch (error) {
+    console.error('[USUARIOS ERRO] Erro ao buscar usuários:', error);
+    res.status(500).json({ message: 'Erro ao buscar lista de usuários.' });
+  }
+});
+
+// --- Rota de Gestão de Acessos (Aprovar/Bloquear/Alterar Status) ---
+app.put('/api/usuarios/:id/status', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { status, role } = req.body; // status: "ATIVO" | "BLOQUEADO" | "PENDENTE"
+
+    const dadosAtualizados: any = {};
+    if (status) dadosAtualizados.status = status;
+    if (role) dadosAtualizados.role = role;
+
+    const usuarioAtualizado = await prisma.usuario.update({
+      where: { id },
+      data: dadosAtualizados,
+      select: { id: true, nome: true, status: true, role: true }
+    });
+
+    console.log(`[GESTAO] Usuário ${usuarioAtualizado.nome} alterado para status: ${usuarioAtualizado.status}`);
+    res.status(200).json({ message: 'Acesso atualizado com sucesso!', usuario: usuarioAtualizado });
+  } catch (error) {
+    console.error('[GESTAO ERRO] Erro ao atualizar usuário:', error);
+    res.status(500).json({ message: 'Erro ao atualizar status do usuário.' });
+  }
+});
 // ==========================================
 // INICIALIZAÇÃO
 // ==========================================
