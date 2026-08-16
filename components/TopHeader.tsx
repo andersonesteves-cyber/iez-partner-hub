@@ -16,10 +16,12 @@ interface UserData {
 export default function TopHeader() {
   const router = useRouter()
   const [user, setUser] = useState<UserData | null>(null)
+  const [carregando, setCarregando] = useState(true)
 
   useEffect(() => {
-    // Carrega o usuário autenticado salvo no localStorage
-    const storedUser = localStorage.getItem('user') || localStorage.getItem('iez_partner_user')
+    // Busca na nova chave 'iez_user' (usada no LoginForm atual) ou nas antigas
+    const storedUser = localStorage.getItem('iez_user') || localStorage.getItem('user') || localStorage.getItem('iez_partner_user')
+    
     if (storedUser) {
       try {
         setUser(JSON.parse(storedUser))
@@ -27,22 +29,28 @@ export default function TopHeader() {
         console.error('Erro ao ler dados do usuário no localStorage:', e)
       }
     }
+    setCarregando(false)
   }, [])
 
   const handleLogout = () => {
+    // Limpa todas as chaves de autenticação possíveis para garantir o logout seguro
+    localStorage.removeItem('iez_user')
+    localStorage.removeItem('iez_token')
     localStorage.removeItem('user')
     localStorage.removeItem('iez_partner_user')
     localStorage.removeItem('token')
+    
     router.push('/login')
   }
 
-  // Tratamento para ler chaves em PT ou EN
-  const nomeExibicao = user?.nome || user?.name || 'Anderson Luiz Fernandes Esteves'
-  const roleExibicao = user?.role || 'ADMIN'
-  const empresaExibicao = user?.empresa || user?.company || 'IEZ! TELECOM'
+  // Tratamento dinâmico: mostra "Carregando..." antes de ler os dados
+  const nomeExibicao = carregando ? 'Carregando...' : (user?.nome || user?.name || 'Visitante')
+  const roleExibicao = carregando ? '...' : (user?.role || 'USUÁRIO')
+  const empresaExibicao = carregando ? '...' : (user?.empresa || user?.company || 'IEZ! TELECOM')
 
   // Gera as iniciais do nome (ex: "Anderson Esteves" -> "AE")
   const getInitials = (fullName: string) => {
+    if (fullName === 'Carregando...' || fullName === 'Visitante') return '--'
     const names = fullName.trim().split(' ')
     if (names.length === 1) return names[0].substring(0, 2).toUpperCase()
     return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase()
