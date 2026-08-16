@@ -43,28 +43,55 @@ app.get('/', (req: Request, res: Response) => {
 // --- Rota de Autenticação (Login) ---
 app.post('/api/auth/login', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, senha } = req.body;
+    // Pegamos o email e senha do body, removendo espaços acidentais do email (.trim())
+    const email = req.body.email?.trim();
+    const senha = req.body.senha;
 
-    // TODO: Ajuste a busca abaixo de acordo com o nome do seu model no schema.prisma (ex: user, usuario)
-    // const user = await prisma.user.findUnique({ where: { email } });
-    
-    // Simulação temporária baseada nos logs da sua seed (Remova após plugar o Prisma real)
-    if (email === 'anderson.esteves@iez.com.br' && senha === '123456') {
-      res.status(200).json({
-        token: 'fake-jwt-token-iez',
-        user: {
-          id: '1',
-          nome: 'Anderson Esteves',
-          email: email,
-          role: 'ADMIN',
-        },
-      });
+    console.log(`[LOGIN] Tentativa de acesso recebida para: '${email}'`);
+
+    if (!email || !senha) {
+      res.status(400).json({ message: 'E-mail e senha são obrigatórios.' });
       return;
     }
 
-    res.status(401).json({ message: 'E-mail ou senha inválidos.' });
+    // Busca o usuário no banco de dados real usando Prisma
+    // Nota: Se o model no schema for "usuario", o Prisma aceita prisma.usuario
+    // Usamos 'any' temporariamente para evitar falhas de tipagem (build error) no Render caso os nomes das colunas mudem
+    const user = await (prisma as any).user.findUnique({ 
+      where: { email: email } 
+    }) || await (prisma as any).usuario?.findUnique({ 
+      where: { email: email } 
+    });
+
+    // Se não encontrou o e-mail no banco
+    if (!user) {
+      console.log('[LOGIN] Falha: E-mail não encontrado no banco de dados.');
+      res.status(401).json({ message: 'E-mail ou senha inválidos.' });
+      return;
+    }
+
+    // Compara a senha informada com a do banco (considerando as colunas 'senha' ou 'password')
+    if (user.senha !== senha && user.password !== senha) {
+      console.log('[LOGIN] Falha: Senha incorreta.');
+      res.status(401).json({ message: 'E-mail ou senha inválidos.' });
+      return;
+    }
+
+    console.log(`[LOGIN] Sucesso! Bem-vindo, ${user.nome || user.name}`);
+    
+    // Retorna os dados para o Frontend salvar no LocalStorage
+    res.status(200).json({
+      token: 'fake-jwt-token-iez', // Em breve substituiremos por um token JWT real
+      user: {
+        id: user.id,
+        nome: user.nome || user.name,
+        email: user.email,
+        role: user.role || 'USUARIO',
+        empresa: user.empresa || user.company || 'IEZ! TELECOM',
+      },
+    });
   } catch (error) {
-    console.error('Erro no login:', error);
+    console.error('[LOGIN ERRO] Falha interna:', error);
     res.status(500).json({ message: 'Erro interno no servidor.' });
   }
 });
@@ -72,9 +99,12 @@ app.post('/api/auth/login', async (req: Request, res: Response): Promise<void> =
 // --- Rota de Solicitação de Cadastro ---
 app.post('/api/solicitacoes', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { nome, email, empresa, senha, perfil } = req.body;
+    const email = req.body.email?.trim();
+    const { nome, empresa, senha, perfil } = req.body;
 
-    // TODO: Criar a inserção no banco via Prisma
+    console.log(`[CADASTRO] Nova solicitação recebida para: ${email}`);
+
+    // TODO: Criar a inserção no banco via Prisma quando o model Solicitacao estiver pronto
     // await prisma.solicitacao.create({ data: { nome, email, empresa, senha, perfil } });
 
     res.status(201).json({
@@ -82,7 +112,7 @@ app.post('/api/solicitacoes', async (req: Request, res: Response): Promise<void>
       dados: { nome, email, empresa, perfil }
     });
   } catch (error) {
-    console.error('Erro ao criar solicitação:', error);
+    console.error('[CADASTRO ERRO] Falha ao criar solicitação:', error);
     res.status(500).json({ message: 'Erro ao processar solicitação de cadastro.' });
   }
 });
@@ -90,12 +120,7 @@ app.post('/api/solicitacoes', async (req: Request, res: Response): Promise<void>
 // --- Rota de Documentos (Listagem) ---
 app.get('/api/documentos', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { categoria, busca } = req.query;
-
-    // TODO: Implementar filtros no Prisma baseados nos query params
-    // const documentos = await prisma.documento.findMany({ ... });
-
-    // Mock temporário para não quebrar o frontend antes da integração do banco
+    // Mock temporário para não quebrar o frontend antes da integração do banco de documentos
     const documentosMock = [
       { id: '1', titulo: 'Guia de Fibra Óptica', categoria: 'Guias Técnicos', data: '2026-08-14' },
       { id: '2', titulo: 'Tabela de Preços 2026', categoria: 'Material Comercial', data: '2026-08-10' }
@@ -103,7 +128,7 @@ app.get('/api/documentos', async (req: Request, res: Response): Promise<void> =>
 
     res.status(200).json(documentosMock);
   } catch (error) {
-    console.error('Erro ao buscar documentos:', error);
+    console.error('[DOCS ERRO] Erro ao buscar documentos:', error);
     res.status(500).json({ message: 'Erro ao buscar documentos.' });
   }
 });
