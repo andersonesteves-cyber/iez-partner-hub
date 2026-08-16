@@ -19,6 +19,7 @@ model Documento {
   empresa           String?  
   descricao         String?
   arquivoUrl        String   
+  enviadoPor        String?  // <-- NOVA LINHA: Registra o nome de quem fez o upload
   criadoEm          DateTime @default(now())
   atualizadoEm      DateTime @updatedAt
 }
