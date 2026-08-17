@@ -9,14 +9,15 @@ interface Empresa {
   createdAt?: string;
 }
 
-const EMPRESAS_INICIAIS: Empresa[] = [
-  { id: '1', nome: 'NetSpeed', status: 'Ativo' },
-  { id: '2', nome: 'Telecom S.A.', status: 'Em Contratação' },
-  { id: '3', nome: 'Conecta Fibra', status: 'Suspenso' },
+const EMPRESAS_PADRAO: Empresa[] = [
+  { id: '1', nome: 'Zamix', status: 'Ativo' },
+  { id: '2', nome: 'NetSpeed', status: 'Ativo' },
+  { id: '3', nome: 'Telecom S.A.', status: 'Em Contratação' },
+  { id: '4', nome: 'Conecta Fibra', status: 'Suspenso' },
 ];
 
 export default function ParceirosPage() {
-  const [empresas, setEmpresas] = useState<Empresa[]>(EMPRESAS_INICIAIS);
+  const [empresas, setEmpresas] = useState<Empresa[]>(EMPRESAS_PADRAO);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
@@ -27,35 +28,69 @@ export default function ParceirosPage() {
 
   const API_URL = 'https://api-iez-partner-hub.onrender.com';
 
+  useEffect(() => {
+    // 1. Carrega dados salvos no localStorage (Persistência Local)
+    const salvos = localStorage.getItem('iez_parceiros');
+    if (salvos) {
+      try {
+        const parsed = JSON.parse(salvos);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setEmpresas(parsed);
+        }
+      } catch (e) {
+        console.warn('Erro ao ler parceiros do localStorage');
+      }
+    }
+
+    // 2. Busca atualizações da API
+    fetchEmpresas();
+  }, []);
+
+  const salvarLocalmente = (novasEmpresas: Empresa[]) => {
+    setEmpresas(novasEmpresas);
+    localStorage.setItem('iez_parceiros', JSON.stringify(novasEmpresas));
+  };
+
   const fetchEmpresas = async () => {
     try {
       const res = await fetch(`${API_URL}/api/empresas`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
-          setEmpresas(data);
+          const formatadas: Empresa[] = data.map((e: any) => ({
+            id: String(e.id),
+            nome: e.nome || e.name || 'Empresa Sem Nome',
+            status: e.status || 'Ativo',
+          }));
+
+          // Mescla garantindo que itens recém-criados localmente não sumam
+          const salvos = localStorage.getItem('iez_parceiros');
+          const locais = salvos ? JSON.parse(salvos) : [];
+          
+          const idsExistentes = new Set(formatadas.map(e => e.id));
+          const unicosLocais = locais.filter((l: Empresa) => !idsExistentes.has(l.id));
+
+          const listaFinal = [...formatadas, ...unicosLocais];
+          salvarLocalmente(listaFinal);
         }
       }
     } catch (error) {
-      console.warn('Usando lista de fallback local para parceiros.');
+      console.warn('Servidor offline. Mantendo cache local de parceiros.');
     }
   };
 
-  useEffect(() => {
-    fetchEmpresas();
-  }, []);
-
   const handleUpdateStatus = async (id: string, status: Empresa['status']) => {
+    const atualizadas = empresas.map((emp) => (emp.id === id ? { ...emp, status } : emp));
+    salvarLocalmente(atualizadas);
+
     try {
       await fetch(`${API_URL}/api/empresas/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       });
-
-      setEmpresas(empresas.map((emp) => (emp.id === id ? { ...emp, status } : emp)));
     } catch (error) {
-      alert('Erro ao atualizar status do contrato.');
+      console.warn('Falha ao sincronizar alteração de status com a API.');
     }
   };
 
@@ -69,19 +104,21 @@ export default function ParceirosPage() {
       status: novoStatus,
     };
 
+    const atualizadas = [nova, ...empresas];
+    salvarLocalmente(atualizadas);
+
+    setIsModalOpen(false);
+    setNovoNome('');
+    setNovoStatus('Ativo');
+
     try {
       await fetch(`${API_URL}/api/empresas`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nome: novoNome, status: novoStatus }),
+        body: JSON.stringify({ nome: nova.nome, status: nova.status }),
       });
-
-      setEmpresas([nova, ...empresas]);
-      setIsModalOpen(false);
-      setNovoNome('');
-      setNovoStatus('Ativo');
     } catch (error) {
-      alert('Erro ao cadastrar empresa.');
+      console.warn('Falha ao enviar novo parceiro para a API backend.');
     }
   };
 
@@ -108,7 +145,7 @@ export default function ParceirosPage() {
 
   return (
     <div className="w-full h-full font-sans">
-      {/* Cabeçalho */}
+      {/* CABEÇALHO */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Gestão de Parceiros</h1>
@@ -122,7 +159,7 @@ export default function ParceirosPage() {
         </button>
       </div>
 
-      {/* Filtros */}
+      {/* FILTROS */}
       <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm mb-6 flex flex-col md:flex-row gap-4">
         <div className="flex-1">
           <input
@@ -146,7 +183,7 @@ export default function ParceirosPage() {
         </select>
       </div>
 
-      {/* Tabela de Empresas */}
+      {/* TABELA DE PARCEIROS */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <table className="w-full text-left text-sm whitespace-nowrap">
           <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
@@ -183,9 +220,9 @@ export default function ParceirosPage() {
         </table>
       </div>
 
-      {/* Modal de Cadastro de Empresa */}
+      {/* MODAL DE CADASTRO */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 font-sans">
           <div className="bg-white rounded-xl shadow-lg w-full max-w-md p-6 border border-gray-100">
             <h2 className="text-lg font-bold text-gray-900 mb-4">Cadastrar Empresa Parceira</h2>
             <form onSubmit={handleCreateEmpresa} className="space-y-4">

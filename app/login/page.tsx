@@ -27,6 +27,30 @@ export default function LoginPage() {
 
   const API_URL = 'https://api-iez-partner-hub.onrender.com';
 
+  const aplicarFallback = () => {
+    // Tenta primeiro os parceiros salvos na Gestão de Parceiros via localStorage
+    const salvos = typeof window !== 'undefined' ? localStorage.getItem('iez_parceiros') : null;
+    if (salvos) {
+      try {
+        const parsed = JSON.parse(salvos);
+        const ativas = parsed.filter((e: any) => String(e.status).toLowerCase() === 'ativo');
+        if (ativas.length > 0) {
+          setEmpresasAtivas(ativas);
+          setEmpresa(ativas[0].nome);
+          return;
+        }
+      } catch (e) {}
+    }
+
+    // Fallback padrão da marca iez!
+    const Padrao = [
+      { id: '1', nome: 'Zamix', status: 'Ativo' },
+      { id: '2', nome: 'NetSpeed', status: 'Ativo' },
+    ];
+    setEmpresasAtivas(Padrao);
+    setEmpresa('Zamix');
+  };
+
   useEffect(() => {
     fetchEmpresasAtivas();
   }, []);
@@ -37,30 +61,29 @@ export default function LoginPage() {
       const res = await fetch(`${API_URL}/api/empresas`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) {
-          // Normalizador tolerante a caixa alta/baixa e nomes de propriedades
+        if (Array.isArray(data) && data.length > 0) {
           const ativas = data
             .map((emp: any) => ({
               id: String(emp.id),
               nome: emp.nome || emp.name || 'Empresa Sem Nome',
-              status: emp.status || 'Ativo',
+              status: String(emp.status || 'Ativo'),
             }))
-            .filter((emp) => emp.status.toString().toLowerCase() === 'ativo');
+            .filter((emp) => emp.status.toLowerCase() === 'ativo');
 
-          setEmpresasAtivas(ativas);
           if (ativas.length > 0) {
+            setEmpresasAtivas(ativas);
             setEmpresa(ativas[0].nome);
+          } else {
+            aplicarFallback();
           }
+        } else {
+          aplicarFallback();
         }
+      } else {
+        aplicarFallback();
       }
     } catch (err) {
-      console.warn('Servidor indisponível, aplicando fallback de empresas ativas.');
-      const fallback = [
-        { id: '1', nome: 'Zamix', status: 'Ativo' },
-        { id: '2', nome: 'NetSpeed', status: 'Ativo' },
-      ];
-      setEmpresasAtivas(fallback);
-      setEmpresa('Zamix');
+      aplicarFallback();
     } finally {
       setLoadingEmpresas(false);
     }
