@@ -4,15 +4,24 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
-export default function Sidebar() {
+interface SidebarProps {
+  isMobileOpen?: boolean;
+  onClose?: () => void;
+}
+
+export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
   const searchParams = useSearchParams();
   const currentQuery = searchParams.get('q') || '';
 
-  return (
-    <aside className="w-64 bg-white border-r border-gray-100 flex flex-col shrink-0 z-10 h-screen font-sans">
+  const handleLinkClick = () => {
+    if (onClose) onClose();
+  };
+
+  const menuContent = (
+    <>
       {/* LOGO */}
-      <div className="h-16 flex items-center px-6 border-b border-gray-100 shrink-0">
-        <Link href="/" className="relative w-24 h-8 block">
+      <div className="h-16 flex items-center justify-between px-6 border-b border-gray-100 shrink-0">
+        <Link href="/" onClick={handleLinkClick} className="relative w-24 h-8 block">
           <Image
             src="/iez-logo-oficial.png"
             alt="iez! telecom"
@@ -21,6 +30,15 @@ export default function Sidebar() {
             priority
           />
         </Link>
+        {/* Botão fechar no mobile */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="md:hidden p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       <nav className="flex-1 py-6 px-4 space-y-6 overflow-y-auto">
@@ -28,6 +46,7 @@ export default function Sidebar() {
         <div>
           <Link
             href="/"
+            onClick={handleLinkClick}
             className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
               !currentQuery ? 'bg-orange-50 text-orange-600 font-bold' : 'text-gray-700 hover:text-orange-600 hover:bg-orange-50'
             }`}
@@ -42,19 +61,39 @@ export default function Sidebar() {
             Categorias
           </p>
           <div className="space-y-1">
-            <Link href="/" className={`block px-3 py-1.5 text-sm rounded-lg transition-colors ${!currentQuery ? 'text-orange-600 font-bold' : 'text-gray-600 hover:text-orange-600'}`}>
+            <Link
+              href="/"
+              onClick={handleLinkClick}
+              className={`block px-3 py-1.5 text-sm rounded-lg transition-colors ${!currentQuery ? 'text-orange-600 font-bold' : 'text-gray-600 hover:text-orange-600'}`}
+            >
               Todos os Documentos
             </Link>
-            <Link href="/?q=manuais" className={`block px-3 py-1.5 text-sm rounded-lg transition-colors ${currentQuery === 'manuais' ? 'text-orange-600 font-bold bg-orange-50' : 'text-gray-600 hover:text-orange-600'}`}>
+            <Link
+              href="/?q=manuais"
+              onClick={handleLinkClick}
+              className={`block px-3 py-1.5 text-sm rounded-lg transition-colors ${currentQuery === 'manuais' ? 'text-orange-600 font-bold bg-orange-50' : 'text-gray-600 hover:text-orange-600'}`}
+            >
               Manuais
             </Link>
-            <Link href="/?q=contratos" className={`block px-3 py-1.5 text-sm rounded-lg transition-colors ${currentQuery === 'contratos' ? 'text-orange-600 font-bold bg-orange-50' : 'text-gray-600 hover:text-orange-600'}`}>
+            <Link
+              href="/?q=contratos"
+              onClick={handleLinkClick}
+              className={`block px-3 py-1.5 text-sm rounded-lg transition-colors ${currentQuery === 'contratos' ? 'text-orange-600 font-bold bg-orange-50' : 'text-gray-600 hover:text-orange-600'}`}
+            >
               Contratos e Termos
             </Link>
-            <Link href="/?q=guias" className={`block px-3 py-1.5 text-sm rounded-lg transition-colors ${currentQuery === 'guias' ? 'text-orange-600 font-bold bg-orange-50' : 'text-gray-600 hover:text-orange-600'}`}>
+            <Link
+              href="/?q=guias"
+              onClick={handleLinkClick}
+              className={`block px-3 py-1.5 text-sm rounded-lg transition-colors ${currentQuery === 'guias' ? 'text-orange-600 font-bold bg-orange-50' : 'text-gray-600 hover:text-orange-600'}`}
+            >
               Guias Técnicos
             </Link>
-            <Link href="/?q=marketing" className={`block px-3 py-1.5 text-sm rounded-lg transition-colors ${currentQuery === 'marketing' ? 'text-orange-600 font-bold bg-orange-50' : 'text-gray-600 hover:text-orange-600'}`}>
+            <Link
+              href="/?q=marketing"
+              onClick={handleLinkClick}
+              className={`block px-3 py-1.5 text-sm rounded-lg transition-colors ${currentQuery === 'marketing' ? 'text-orange-600 font-bold bg-orange-50' : 'text-gray-600 hover:text-orange-600'}`}
+            >
               Material Comercial
             </Link>
           </div>
@@ -66,10 +105,18 @@ export default function Sidebar() {
             Administração
           </p>
           <div className="space-y-1">
-            <Link href="/usuarios" className="block px-3 py-1.5 text-sm text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors">
+            <Link
+              href="/usuarios"
+              onClick={handleLinkClick}
+              className="block px-3 py-1.5 text-sm text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+            >
               Gestão de Acessos
             </Link>
-            <Link href="/parceiros" className="block px-3 py-1.5 text-sm text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors">
+            <Link
+              href="/parceiros"
+              onClick={handleLinkClick}
+              className="block px-3 py-1.5 text-sm text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+            >
               Gestão de Parceiros
             </Link>
           </div>
@@ -81,6 +128,31 @@ export default function Sidebar() {
           iez! Partner Hub © 2026
         </p>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* VERSÃO DESKTOP (Fixa na tela em monitores md+) */}
+      <aside className="hidden md:flex w-64 bg-white border-r border-gray-100 flex-col shrink-0 z-20 h-screen font-sans">
+        {menuContent}
+      </aside>
+
+      {/* VERSÃO MOBILE (Gaveta Deslizante com Máscara Escura) */}
+      {isMobileOpen && (
+        <div
+          className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-40 md:hidden transition-opacity"
+          onClick={onClose}
+        />
+      )}
+
+      <aside
+        className={`fixed inset-y-0 left-0 w-64 bg-white z-50 flex flex-col h-full font-sans shadow-2xl transition-transform duration-300 ease-in-out md:hidden ${
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        {menuContent}
+      </aside>
+    </>
   );
 }

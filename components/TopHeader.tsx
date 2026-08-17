@@ -13,24 +13,25 @@ interface UserData {
   company?: string;
 }
 
-export default function TopHeader() {
+interface TopHeaderProps {
+  onOpenMobileMenu?: () => void;
+}
+
+export default function TopHeader({ onOpenMobileMenu }: TopHeaderProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Lê a query atual da URL para manter o campo de busca sincronizado
   const currentQuery = searchParams.get('q') || '';
 
   const [user, setUser] = useState<UserData | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [searchTerm, setSearchTerm] = useState(currentQuery);
 
-  // Sincroniza o input quando a URL muda por outro componente (ex: Sidebar)
   useEffect(() => {
     setSearchTerm(currentQuery);
   }, [currentQuery]);
 
   useEffect(() => {
-    // Busca os dados do usuário nas chaves suportadas
     const storedUser =
       localStorage.getItem('iez_user') ||
       localStorage.getItem('user') ||
@@ -46,19 +47,15 @@ export default function TopHeader() {
     setCarregando(false);
   }, []);
 
-  // Logout seguro com renovação total de estado e redirecionamento de janela
   const handleLogout = () => {
     localStorage.removeItem('iez_user');
     localStorage.removeItem('user');
     localStorage.removeItem('iez_token');
     localStorage.removeItem('token');
     localStorage.removeItem('iez_partner_user');
-    
-    // Força o reload/redirecionamento duro para acionar o AuthGuard imediatamente
     window.location.href = '/login';
   };
 
-  // Dispara a busca global ao pressionar Enter
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       if (searchTerm.trim()) {
@@ -69,12 +66,10 @@ export default function TopHeader() {
     }
   };
 
-  // Formatação dinâmica dos dados de perfil
   const nomeExibicao = carregando ? 'Carregando...' : user?.nome || user?.name || 'Visitante';
   const roleExibicao = carregando ? '...' : user?.role || 'USUÁRIO';
   const empresaExibicao = carregando ? '...' : user?.empresa || user?.company || 'IEZ! TELECOM';
 
-  // Gera as iniciais do nome (ex: "Anderson Esteves" -> "AE")
   const getInitials = (fullName: string) => {
     if (fullName === 'Carregando...' || fullName === 'Visitante') return '--';
     const names = fullName.trim().split(' ');
@@ -87,9 +82,19 @@ export default function TopHeader() {
   return (
     <header className="h-16 bg-white border-b border-gray-100 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-sm font-sans selection:bg-orange-100 selection:text-orange-900">
       
-      {/* BARRA DE BUSCA GLOBAL */}
-      <div className="flex-1 max-w-md">
-        <div className="relative">
+      {/* BOTÃO HAMBÚRGUER MOBILE + BARRA DE BUSCA */}
+      <div className="flex items-center gap-2 flex-1 max-w-md">
+        <button
+          onClick={onOpenMobileMenu}
+          className="md:hidden p-2 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors shrink-0"
+          aria-label="Abrir Menu"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+
+        <div className="relative w-full">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -100,16 +105,14 @@ export default function TopHeader() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Buscar processos, PDFs, vídeos (Aperte Enter)..."
-            className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white transition-all text-gray-800 placeholder-gray-400"
+            placeholder="Buscar documentos..."
+            className="w-full pl-9 pr-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white transition-all text-gray-800 placeholder-gray-400"
           />
         </div>
       </div>
 
       {/* ÁREA DO USUÁRIO LOGADO */}
-      <div className="flex items-center space-x-3 sm:space-x-4">
-        
-        {/* NOME, ROLE E EMPRESA */}
+      <div className="flex items-center space-x-2 sm:space-x-4 pl-2">
         <div className="text-right hidden sm:block">
           <p className="text-xs font-bold text-gray-800 leading-tight">
             {nomeExibicao}
@@ -121,17 +124,15 @@ export default function TopHeader() {
           </p>
         </div>
 
-        {/* AVATAR COM INICIAIS DA IEZ! */}
-        <div className="w-9 h-9 rounded-full bg-orange-100 border border-orange-300 flex items-center justify-center font-bold text-orange-700 text-xs shadow-sm">
+        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-orange-100 border border-orange-300 flex items-center justify-center font-bold text-orange-700 text-xs shadow-sm shrink-0">
           {iniciais}
         </div>
 
         <div className="h-5 w-px bg-gray-200 hidden sm:block" />
 
-        {/* BOTÃO DE LOGOUT */}
         <button
           onClick={handleLogout}
-          className="text-xs font-medium text-gray-500 hover:text-orange-600 transition-colors py-1 px-2.5 rounded-md hover:bg-orange-50 active:bg-orange-100"
+          className="text-xs font-medium text-gray-500 hover:text-orange-600 transition-colors py-1 px-2 rounded-md hover:bg-orange-50"
         >
           Sair
         </button>

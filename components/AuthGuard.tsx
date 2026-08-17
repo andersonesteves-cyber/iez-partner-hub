@@ -10,6 +10,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const checkAuth = () => {
@@ -33,14 +34,13 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     };
 
     checkAuth();
+    setIsMobileMenuOpen(false); // Fecha menu mobile ao trocar de página
   }, [pathname, router]);
 
-  // Se estiver na tela de login, exibe apenas o formulário sem Sidebar/Header
   if (pathname === '/login') {
     return <>{children}</>;
   }
 
-  // Enquanto valida a sessão, exibe tela de carregamento com a identidade da iez!
   if (loading) {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-gray-50 font-sans selection:bg-orange-100 selection:text-orange-900">
@@ -50,21 +50,22 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Se não houver autenticação, bloqueia completamente a renderização do acervo
   if (!isAuthenticated) {
     return null;
   }
 
-  // Layout Protegido Interno (Sidebar + Header + Conteúdo)
   return (
     <div className="flex h-screen w-full overflow-hidden bg-gray-50 selection:bg-orange-100 selection:text-orange-900">
       <Suspense fallback={<div className="w-64 bg-white border-r border-gray-100 h-screen hidden md:block shrink-0" />}>
-        <Sidebar />
+        <Sidebar
+          isMobileOpen={isMobileMenuOpen}
+          onClose={() => setIsMobileMenuOpen(false)}
+        />
       </Suspense>
 
       <div className="flex-1 flex flex-col min-w-0 h-full relative overflow-hidden">
         <Suspense fallback={<div className="h-16 bg-white border-b border-gray-100 shrink-0" />}>
-          <TopHeader />
+          <TopHeader onOpenMobileMenu={() => setIsMobileMenuOpen(true)} />
         </Suspense>
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 w-full max-w-7xl mx-auto">
