@@ -40,7 +40,8 @@ const upload = multer({ storage });
 // ==========================================
 app.use(
   cors({
-    origin: ['https://iez-partner-hub.vercel.app', 'http://localhost:3000'],
+    // Permite qualquer origem temporariamente para evitar bloqueios da Vercel
+    origin: '*', 
     credentials: true,
   })
 );
@@ -119,9 +120,9 @@ app.get('/api/documentos', async (req: Request, res: Response): Promise<void> =>
       id: doc.id,
       titulo: doc.titulo,
       categoria: doc.categoria,
-      arquivoUrl: doc.arquivoUrl,
-      enviadoPor: doc.enviadoPor,
-      data: doc.atualizadoEm.toISOString().split('T')[0]
+      pdfUrl: doc.arquivoUrl, // Alinhado com a tipagem do frontend que espera pdfUrl
+      dataCriacao: doc.atualizadoEm.toISOString(), // Ajustado para o formato do Card
+      enviadoPor: doc.enviadoPor
     }));
 
     res.status(200).json(docsFormatados);
@@ -130,31 +131,43 @@ app.get('/api/documentos', async (req: Request, res: Response): Promise<void> =>
   }
 });
 
-// --- NOVA ROTA: UPLOAD DE NOVO DOCUMENTO ---
-app.post('/api/documentos', upload.single('arquivo'), async (req: Request, res: Response): Promise<void> => {
+// --- NOVA ROTA: UPLOAD DE NOVO DOCUMENTO (CORRIGIDA) ---
+// O frontend envia a chave 'file', então o multer precisa interceptar 'file'
+app.post('/api/documentos', upload.single('file'), async (req: Request, res: Response): Promise<void> => {
   try {
-    const { titulo, categoria, nivelAcesso, regraVisibilidade, enviadoPor } = req.body;
+    // Alinhado com os nomes exatos enviados pelo Modal
+    const { titulo, categoria, nivelAcesso, visibilidade, empresa } = req.body;
     const arquivo = req.file;
 
     if (!arquivo) {
       res.status(400).json({ message: 'Nenhum arquivo enviado.' }); return;
     }
 
-    // Cria a URL pública para acessar o arquivo
+    // Cria a URL pública para acessar o arquivo (rota /uploads)
     const arquivoUrl = `/uploads/${arquivo.filename}`;
 
     const novoDocumento = await prisma.documento.create({
       data: {
         titulo,
         categoria,
-        nivelAcesso: nivelAcesso || 'TODOS',
-        regraVisibilidade: regraVisibilidade || 'GERAL',
+        nivelAcesso: nivelAcesso || 'Partner (Todos)',
+        // No schema está regraVisibilidade, mas o frontend enviou 'visibilidade'
+        regraVisibilidade: visibilidade === 'restrita' ? 'RESTRITA' : 'GERAL',
         arquivoUrl,
-        enviadoPor
+        enviadoPor: 'Admin' // No futuro, puxar do usuário logado no Token JWT
       }
     });
 
-    res.status(201).json(novoDocumento);
+    // Mapeamos para que o Frontend (DocumentosManager) renderize instantaneamente
+    const docFormatado = {
+      id: novoDocumento.id,
+      titulo: novoDocumento.titulo,
+      categoria: novoDocumento.categoria,
+      pdfUrl: novoDocumento.arquivoUrl,
+      dataCriacao: novoDocumento.atualizadoEm.toISOString()
+    };
+
+    res.status(201).json(docFormatado);
   } catch (error) {
     console.error('Erro no upload:', error);
     res.status(500).json({ message: 'Erro ao salvar o documento.' });
@@ -178,12 +191,13 @@ app.put('/api/documentos/:id', async (req: Request, res: Response): Promise<void
     res.status(500).json({ message: 'Erro ao atualizar o documento.' });
   }
 });
+
 // --- Rota de Gestão de Acessos (Listar Usuários) ---
 app.get('/api/usuarios', async (req: Request, res: Response): Promise<void> => {
   try {
     const usuarios = await prisma.usuario.findMany({
       orderBy: [
-        { status: 'asc' }, // Traz os PENDENTES primeiro (ordem alfabética: ATIVO, BLOQUEADO, PENDENTE... na verdade PENDENTE vai pro final, vamos ordenar por criadoEm)
+        { status: 'asc' }, 
         { criadoEm: 'desc' }
       ],
       select: {
@@ -208,7 +222,7 @@ app.get('/api/usuarios', async (req: Request, res: Response): Promise<void> => {
 app.put('/api/usuarios/:id/status', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { status, role } = req.body; // status: "ATIVO" | "BLOQUEADO" | "PENDENTE"
+    const { status, role } = req.body;
 
     const dadosAtualizados: any = {};
     if (status) dadosAtualizados.status = status;
@@ -227,6 +241,7 @@ app.put('/api/usuarios/:id/status', async (req: Request, res: Response): Promise
     res.status(500).json({ message: 'Erro ao atualizar status do usuário.' });
   }
 });
+
 // ==========================================
 // INICIALIZAÇÃO
 // ==========================================
