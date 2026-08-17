@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import NovoDocumentoModal from './NovoDocumentoModal';
 
 interface Documento {
   id: string;
@@ -25,6 +26,7 @@ export default function DocumentosManager({
 }: DocumentosManagerProps) {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [documentoExcluir, setDocumentoExcluir] = useState<Documento | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [documentos, setDocumentos] = useState<Documento[]>([
     {
@@ -74,16 +76,20 @@ export default function DocumentosManager({
   const isAdmin = ['ADMIN', 'IEZ_ADMIN', 'COMPANY_ADMIN'].includes(userRole);
   const isIezAdmin = ['ADMIN', 'IEZ_ADMIN'].includes(userRole);
 
+  const handleSalvarNovoDocumento = (novoDoc: Documento) => {
+    const atualizados = [novoDoc, ...documentos];
+    setDocumentos(atualizados);
+    localStorage.setItem('iez_documentos', JSON.stringify(atualizados));
+  };
+
   const handleConfirmarExclusao = () => {
     if (!documentoExcluir) return;
-
     const atualizados = documentos.filter((d) => d.id !== documentoExcluir.id);
     setDocumentos(atualizados);
     localStorage.setItem('iez_documentos', JSON.stringify(atualizados));
     setDocumentoExcluir(null);
   };
 
-  // Filtra por Categoria e por Termo de Busca da URL
   const documentosFiltrados = documentos.filter((doc) => {
     const termo = searchQuery.toLowerCase();
     const matchesSearch =
@@ -95,7 +101,6 @@ export default function DocumentosManager({
     const matchesCategoria =
       !categoriaUrl || doc.categoria.toLowerCase().includes(categoriaUrl.toLowerCase());
 
-    // Regra de Visibilidade por Empresa
     if (isIezAdmin) return matchesSearch && matchesCategoria;
     if (doc.visibilidade === 'restrita') {
       return (
@@ -109,11 +114,32 @@ export default function DocumentosManager({
   });
 
   return (
-    <div className="font-sans selection:bg-orange-100 selection:text-orange-900">
+    <div className="space-y-6 font-sans selection:bg-orange-100 selection:text-orange-900">
+      
+      {/* CABEÇALHO DO ACERVO COM O BOTÃO + NOVO DOCUMENTO */}
+      <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Acervo de Documentos</h1>
+          <p className="text-xs text-gray-500 mt-1">
+            Consulte e gerencie os manuais, termos e insumos da iez! telecom.
+          </p>
+        </div>
+
+        {isAdmin && (
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="inline-flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 active:bg-orange-800 text-white font-bold text-xs px-4 py-3 rounded-xl shadow-sm transition-all"
+          >
+            <span>+</span> Novo Documento
+          </button>
+        )}
+      </div>
+
+      {/* GRID DE CARDS */}
       {documentosFiltrados.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
           <p className="text-sm font-semibold text-gray-500">
-            Nenhum documento encontrado para a busca especificada.
+            Nenhum documento encontrado para os filtros selecionados.
           </p>
         </div>
       ) : (
@@ -166,7 +192,14 @@ export default function DocumentosManager({
         </div>
       )}
 
-      {/* Modal de Confirmação de Exclusão */}
+      {/* MODAL DE NOVO DOCUMENTO */}
+      <NovoDocumentoModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={handleSalvarNovoDocumento}
+      />
+
+      {/* MODAL DE EXCLUSÃO */}
       {documentoExcluir && (
         <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 border border-gray-100 text-center">

@@ -14,8 +14,13 @@ interface Usuario {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api-iez-partner-hub.onrender.com';
 
+const USUARIOS_PADRAO: Usuario[] = [
+  { id: '1', nome: 'Anderson Luiz Fernandes Esteves', email: 'anderson.esteves@iez.com.br', empresa: 'IEZ! TELECOM', role: 'ADMIN', status: 'ATIVO' },
+  { id: '2', nome: 'Renato Pereira Soares', email: 'renato.soares@iez.com.br', empresa: 'iez! Telecom', role: 'ADMIN', status: 'ATIVO' },
+];
+
 export default function GestaoAcessosPage() {
-  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [usuarios, setUsuarios] = useState<Usuario[]>(USUARIOS_PADRAO);
   const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('TODOS');
@@ -31,30 +36,38 @@ export default function GestaoAcessosPage() {
   const [novoRole, setNovoRole] = useState<'USER' | 'COMPANY_ADMIN' | 'ADMIN'>('USER');
   const [empresasAtivas, setEmpresasAtivas] = useState<{ id: string; nome: string }[]>([]);
 
-  // Modais de Edição/Ações
+  // Modais de Ações
   const [userEditRole, setUserEditRole] = useState<Usuario | null>(null);
   const [roleEditState, setRoleEditState] = useState<string>('USER');
   const [userResetPassword, setUserResetPassword] = useState<Usuario | null>(null);
   const [senhaResetInput, setSenhaResetInput] = useState('');
   const [userToDelete, setUserToDelete] = useState<Usuario | null>(null);
 
-  // Leitura do Perfil Logado
   useEffect(() => {
     const stored = localStorage.getItem('iez_user') || localStorage.getItem('user');
     if (stored) {
       try {
-        const parsed = JSON.parse(stored);
-        setCurrentUser(parsed);
+        setCurrentUser(JSON.parse(stored));
       } catch (e) {}
     }
 
-    // Carrega parceiros ativos para o formulário
-    const salvos = localStorage.getItem('iez_parceiros');
-    if (salvos) {
+    const parceirosSalvos = localStorage.getItem('iez_parceiros');
+    if (parceirosSalvos) {
       try {
-        const parsed = JSON.parse(salvos);
+        const parsed = JSON.parse(parceirosSalvos);
         const ativas = parsed.filter((p: any) => String(p.status).toLowerCase() === 'ativo');
         setEmpresasAtivas(ativas);
+      } catch (e) {}
+    }
+
+    // Leitura inicial imediata do cache local para resposta rápida na UI
+    const salvosLocais = localStorage.getItem('iez_usuarios');
+    if (salvosLocais) {
+      try {
+        const parsedLocais = JSON.parse(salvosLocais);
+        if (Array.isArray(parsedLocais) && parsedLocais.length > 0) {
+          setUsuarios(parsedLocais);
+        }
       } catch (e) {}
     }
 
@@ -66,45 +79,36 @@ export default function GestaoAcessosPage() {
   const isIezAdmin = ['ADMIN', 'IEZ_ADMIN'].includes(userRole);
   const isCompanyAdmin = userRole === 'COMPANY_ADMIN';
 
-  const fetchUsuarios = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/api/usuarios`);
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        setUsuarios(data);
-        localStorage.setItem('iez_usuarios', JSON.stringify(data));
-      } else {
-        carregarFallbackLocal();
-      }
-    } catch (err) {
-      carregarFallbackLocal();
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const carregarFallbackLocal = () => {
-    const salvos = localStorage.getItem('iez_usuarios');
-    if (salvos) {
-      try {
-        setUsuarios(JSON.parse(salvos));
-        return;
-      } catch (e) {}
-    }
-    setUsuarios([
-      { id: '1', nome: 'Anderson Esteves', email: 'anderson@iez.com.br', empresa: 'IEZ! TELECOM', role: 'ADMIN', status: 'ATIVO' },
-      { id: '2', nome: 'Carlos Silva', email: 'carlos@netspeed.com.br', empresa: 'NetSpeed', role: 'COMPANY_ADMIN', status: 'ATIVO' },
-    ]);
-  };
-
   const atualizarEstadoLocal = (novos: Usuario[]) => {
     setUsuarios(novos);
     localStorage.setItem('iez_usuarios', JSON.stringify(novos));
   };
 
-  // Abrir Modal de Criação aplicando travas por Perfil
+  const fetchUsuarios = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/usuarios`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          // Mescla itens vindos da API com novidades cadastradas localmente
+          const salvosLocais = localStorage.getItem('iez_usuarios');
+          const locais: Usuario[] = salvosLocais ? JSON.parse(salvosLocais) : [];
+
+          const idsApi = new Set(data.map((u: any) => String(u.id)));
+          const novosApenasLocais = locais.filter((l) => !idsApi.has(String(l.id)));
+
+          const listaConsolidada = [...novosApenasLocais, ...data];
+          atualizarEstadoLocal(listaConsolidada);
+        }
+      }
+    } catch (err) {
+      console.warn('API indisponível. Mantendo usuários do cache local.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleOpenCreateModal = () => {
     setNovoNome('');
     setNovoEmail('');
@@ -122,7 +126,6 @@ export default function GestaoAcessosPage() {
     setIsCreateOpen(true);
   };
 
-  // Cadastrar Novo Usuário
   const handleCreateUser = async (e: FormEvent) => {
     e.preventDefault();
     if (!novoNome || !novoEmail || !novaSenha) return;
@@ -149,12 +152,15 @@ export default function GestaoAcessosPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(novoUsuario),
       });
-    } catch (err) {}
+    } catch (err) {
+      console.warn('Servidor offline. Usuário registrado localmente.');
+    }
   };
 
   const handleAlterarStatus = async (id: string, novoStatus: 'ATIVO' | 'BLOQUEADO') => {
     const atualizados = usuarios.map((u) => (u.id === id ? { ...u, status: novoStatus } : u));
     atualizarEstadoLocal(atualizados);
+
     try {
       await fetch(`${API_URL}/api/usuarios/${id}/status`, {
         method: 'PATCH',
@@ -173,7 +179,7 @@ export default function GestaoAcessosPage() {
 
   const handleEnviarNovaSenha = async () => {
     if (!userResetPassword || !senhaResetInput.trim()) return;
-    alert(`Senha redefinida e enviada por e-mail para ${userResetPassword.email}!`);
+    alert(`Senha redefinida com sucesso para ${userResetPassword.email}!`);
     setUserResetPassword(null);
     setSenhaResetInput('');
   };
@@ -187,8 +193,13 @@ export default function GestaoAcessosPage() {
 
   const usuariosFiltrados = usuarios.filter((u) => {
     const termo = busca.toLowerCase();
-    const matchBusca = u.nome.toLowerCase().includes(termo) || u.email.toLowerCase().includes(termo) || u.empresa.toLowerCase().includes(termo);
+    const matchBusca =
+      u.nome.toLowerCase().includes(termo) ||
+      u.email.toLowerCase().includes(termo) ||
+      u.empresa.toLowerCase().includes(termo);
+
     const matchStatus = filtroStatus === 'TODOS' || u.status === filtroStatus;
+
     const matchPerfil =
       filtroPerfil === 'TODOS' ||
       (filtroPerfil === 'ADMIN' && u.role === 'ADMIN') ||
@@ -198,23 +209,26 @@ export default function GestaoAcessosPage() {
     if (isCompanyAdmin) {
       return matchBusca && matchStatus && matchPerfil && u.empresa.toLowerCase() === userEmpresa.toLowerCase();
     }
+
     return matchBusca && matchStatus && matchPerfil;
   });
 
   return (
     <div className="space-y-6 font-sans selection:bg-orange-100 selection:text-orange-900">
       
-      {/* CABEÇALHO COM BOTÃO DE CRIAÇÃO */}
+      {/* CABEÇALHO */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-gray-100">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Gestão de Acessos</h1>
-          <p className="text-sm text-gray-500 mt-1">Aprove cadastros, crie novos usuários e gerencie permissões.</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Aprove cadastros, crie novos usuários e gerencie permissões.
+          </p>
         </div>
 
         {(isIezAdmin || isCompanyAdmin) && (
           <button
             onClick={handleOpenCreateModal}
-            className="inline-flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold text-xs px-4 py-2.5 rounded-lg shadow-sm transition-all"
+            className="inline-flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 active:bg-orange-800 text-white font-bold text-xs px-4 py-3 rounded-xl shadow-sm transition-all"
           >
             <span>+</span> Cadastrar Novo Usuário
           </button>
@@ -261,9 +275,9 @@ export default function GestaoAcessosPage() {
         </div>
       </div>
 
-      {/* TABELA */}
+      {/* TABELA DE USUÁRIOS */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        {loading ? (
+        {loading && usuariosFiltrados.length === 0 ? (
           <div className="p-8 text-center text-gray-400 font-medium">Carregando usuários...</div>
         ) : usuariosFiltrados.length === 0 ? (
           <div className="p-12 text-center text-gray-500">Nenhum usuário encontrado.</div>
@@ -389,7 +403,6 @@ export default function GestaoAcessosPage() {
                 />
               </div>
 
-              {/* SELEÇÃO DE EMPRESA COM RESTRIÇÃO POR PERFIL */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">Empresa Parceira *</label>
                 {isIezAdmin ? (
@@ -415,7 +428,6 @@ export default function GestaoAcessosPage() {
                 )}
               </div>
 
-              {/* SELEÇÃO DE PERFIL COM RESTRIÇÃO */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">Nível de Acesso *</label>
                 <select
