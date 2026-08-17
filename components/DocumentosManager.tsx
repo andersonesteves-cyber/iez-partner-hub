@@ -14,7 +14,15 @@ interface Documento {
   dataEnvio?: string;
 }
 
-export default function DocumentosManager({ categoriaUrl = '' }: { categoriaUrl?: string }) {
+interface DocumentosManagerProps {
+  categoriaUrl?: string;
+  searchQuery?: string;
+}
+
+export default function DocumentosManager({
+  categoriaUrl = '',
+  searchQuery = '',
+}: DocumentosManagerProps) {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [documentoExcluir, setDocumentoExcluir] = useState<Documento | null>(null);
 
@@ -32,6 +40,14 @@ export default function DocumentosManager({ categoriaUrl = '' }: { categoriaUrl?
       titulo: 'Apresentação Go-To-Market',
       descricao: 'Guia completo de estratégia comercial e lançamento.',
       categoria: 'Material Comercial',
+      enviadoPor: 'Admin iez!',
+      dataEnvio: '17/08/2026',
+    },
+    {
+      id: '3',
+      titulo: 'Guia Técnico de Integrações',
+      descricao: 'Documentação de APIs e configurações para ISPs parceiros.',
+      categoria: 'Guias Técnicos',
       enviadoPor: 'Admin iez!',
       dataEnvio: '17/08/2026',
     },
@@ -54,8 +70,9 @@ export default function DocumentosManager({ categoriaUrl = '' }: { categoriaUrl?
   }, []);
 
   const userRole = currentUser?.role?.toUpperCase() || 'USER';
-  // Apenas Admins enxergam a ação de exclusão
+  const userEmpresa = currentUser?.empresa || currentUser?.company || '';
   const isAdmin = ['ADMIN', 'IEZ_ADMIN', 'COMPANY_ADMIN'].includes(userRole);
+  const isIezAdmin = ['ADMIN', 'IEZ_ADMIN'].includes(userRole);
 
   const handleConfirmarExclusao = () => {
     if (!documentoExcluir) return;
@@ -66,58 +83,90 @@ export default function DocumentosManager({ categoriaUrl = '' }: { categoriaUrl?
     setDocumentoExcluir(null);
   };
 
-  return (
-    <div className="font-sans">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {documentos.map((doc) => (
-          <div
-            key={doc.id}
-            className="bg-white p-5 rounded-2xl border border-gray-100 hover:border-orange-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between relative group"
-          >
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 bg-orange-50 px-2.5 py-1 rounded-md">
-                  {doc.categoria}
-                </span>
+  // Filtra por Categoria e por Termo de Busca da URL
+  const documentosFiltrados = documentos.filter((doc) => {
+    const termo = searchQuery.toLowerCase();
+    const matchesSearch =
+      !termo ||
+      doc.titulo.toLowerCase().includes(termo) ||
+      doc.descricao.toLowerCase().includes(termo) ||
+      doc.categoria.toLowerCase().includes(termo);
 
-                {/* BOTÃO DE EXCLUIR ARQUIVO (VISÍVEL APENAS PARA ADMINS) */}
-                {isAdmin && (
-                  <button
-                    onClick={() => setDocumentoExcluir(doc)}
-                    title="Excluir arquivo"
-                    className="text-gray-300 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
-                  >
-                    🗑️
-                  </button>
-                )}
+    const matchesCategoria =
+      !categoriaUrl || doc.categoria.toLowerCase().includes(categoriaUrl.toLowerCase());
+
+    // Regra de Visibilidade por Empresa
+    if (isIezAdmin) return matchesSearch && matchesCategoria;
+    if (doc.visibilidade === 'restrita') {
+      return (
+        matchesSearch &&
+        matchesCategoria &&
+        doc.empresaRestrita?.toLowerCase() === userEmpresa.toLowerCase()
+      );
+    }
+
+    return matchesSearch && matchesCategoria;
+  });
+
+  return (
+    <div className="font-sans selection:bg-orange-100 selection:text-orange-900">
+      {documentosFiltrados.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
+          <p className="text-sm font-semibold text-gray-500">
+            Nenhum documento encontrado para a busca especificada.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {documentosFiltrados.map((doc) => (
+            <div
+              key={doc.id}
+              className="bg-white p-5 rounded-2xl border border-gray-100 hover:border-orange-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between relative group"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 bg-orange-50 px-2.5 py-1 rounded-md">
+                    {doc.categoria}
+                  </span>
+
+                  {isAdmin && (
+                    <button
+                      onClick={() => setDocumentoExcluir(doc)}
+                      title="Excluir arquivo"
+                      className="text-gray-300 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </div>
+
+                <h3 className="text-base font-bold text-gray-900 group-hover:text-orange-600 transition-colors">
+                  {doc.titulo}
+                </h3>
+
+                <p className="text-xs text-gray-500 mt-2 line-clamp-2 leading-relaxed">
+                  {doc.descricao || 'Sem descrição cadastrada.'}
+                </p>
               </div>
 
-              <h3 className="text-base font-bold text-gray-900 group-hover:text-orange-600 transition-colors">
-                {doc.titulo}
-              </h3>
+              <div className="mt-6 pt-3 border-t border-gray-50 flex items-center justify-between text-xs">
+                <span className="text-[11px] text-gray-400 font-medium">
+                  {doc.enviadoPor || 'Admin'}
+                </span>
 
-              <p className="text-xs text-gray-500 mt-2 line-clamp-2 leading-relaxed">
-                {doc.descricao || 'Sem descrição cadastrada.'}
-              </p>
+                <Link
+                  href={`/documento/${doc.id}`}
+                  className="text-orange-600 font-bold hover:text-orange-700 transition-colors"
+                >
+                  Acessar arquivo →
+                </Link>
+              </div>
             </div>
+          ))}
+        </div>
+      )}
 
-            <div className="mt-6 pt-3 border-t border-gray-50 flex items-center justify-between text-xs">
-              <span className="text-[11px] text-gray-400 font-medium">
-                {doc.enviadoPor || 'Admin'}
-              </span>
-
-              <Link
-                href={`/documento/${doc.id}`}
-                className="text-orange-600 font-bold hover:text-orange-700 transition-colors"
-              >
-                Acessar arquivo →
-              </Link>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO DO ARQUIVO */}
+      {/* Modal de Confirmação de Exclusão */}
       {documentoExcluir && (
         <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 border border-gray-100 text-center">
