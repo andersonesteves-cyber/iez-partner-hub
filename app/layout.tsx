@@ -1,43 +1,49 @@
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import { Suspense } from 'react'
-import Sidebar from '@/components/Sidebar'
-import Header from '@/components/TopHeader'
-import './globals.css'
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import { Suspense } from 'react';
+import Sidebar from '@/components/Sidebar';
+import TopHeader from '@/components/TopHeader';
+import './globals.css';
 
 // Configuração da Fonte Inter (Identidade Visual da marca iez!)
-const inter = Inter({ subsets: ['latin'], display: 'swap' })
+const inter = Inter({ subsets: ['latin'], display: 'swap' });
 
 export const metadata: Metadata = {
   title: 'iez! Partner Hub',
   description: 'Portal de documentos e materiais de apoio aos parceiros da iez! telecom.',
-}
+};
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode
+  children: React.ReactNode;
 }>) {
   return (
     <html lang="pt-BR" className={inter.className}>
-      <body className="bg-gray-50 text-gray-800 antialiased min-h-screen flex overflow-x-hidden">
+      <body className="bg-gray-50 text-gray-800 antialiased h-screen flex overflow-hidden selection:bg-orange-100 selection:text-orange-900">
         
-        {/* Suspense em volta da Sidebar para contornar o uso do useSearchParams */}
-        <Suspense fallback={<div className="w-64 bg-white border-r h-screen hidden md:block" />}>
+        {/* Sidebar isolada em Suspense (caso consuma useSearchParams para indicar item ativo) */}
+        <Suspense fallback={<div className="w-64 bg-white border-r border-gray-100 h-screen hidden md:block shrink-0" />}>
           <Sidebar />
         </Suspense>
 
-        {/* Container Principal */}
-        <div className="flex-1 flex flex-col min-w-0 w-full">
+        {/* Container Conteúdo Principal */}
+        <div className="flex-1 flex flex-col min-w-0 h-full relative overflow-hidden">
           
-          {/* Suspense no Header também pelo mesmo motivo (barra de busca) */}
-          <Suspense fallback={<div className="h-16 bg-white border-b border-gray-200" />}>
-            <Header />
+          {/* TopHeader em Suspense para leitura de busca via useSearchParams */}
+          <Suspense fallback={<div className="h-16 bg-white border-b border-gray-100 shrink-0" />}>
+            <TopHeader />
           </Suspense>
 
-          {/* Conteúdo Dinâmico */}
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
-            <Suspense fallback={<div className="flex justify-center p-10 text-orange-500">Carregando portal...</div>}>
+          {/* Área de Conteúdo com Scroll Próprio */}
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 w-full max-w-7xl mx-auto">
+            <Suspense
+              fallback={
+                <div className="flex items-center justify-center p-12 text-orange-600 font-semibold text-sm">
+                  Carregando portal...
+                </div>
+              }
+            >
               {children}
             </Suspense>
           </main>
@@ -45,5 +51,5 @@ export default function RootLayout({
         </div>
       </body>
     </html>
-  )
+  );
 }

@@ -250,3 +250,70 @@ process.on('SIGTERM', async () => { await prisma.$disconnect(); process.exit(0);
 app.listen(PORT, () => {
   console.log(`[IEZ! BACKEND] Servidor rodando na porta ${PORT}`);
 });
+// ------------------------------------------------------------------
+// ROTAS DE GESTÃO DE PARCEIROS (EMPRESAS)
+// ------------------------------------------------------------------
+
+// Lista MOCK inicial de parceiros para fallback
+let empresasMock = [
+  { id: '1', nome: 'NetSpeed', status: 'Ativo', createdAt: new Date().toISOString() },
+  { id: '1', nome: 'Zamix', status: 'Ativo', createdAt: new Date().toISOString() },
+  { id: '1', nome: 'G6', status: 'Ativo', createdAt: new Date().toISOString() },
+  { id: '2', nome: 'RedeNets', status: 'Em Contratação', createdAt: new Date().toISOString() },
+  { id: '2', nome: 'ACME', status: 'Em Contratação', createdAt: new Date().toISOString() },
+  { id: '3', nome: 'Conecta Fibra', status: 'Suspenso', createdAt: new Date().toISOString() },
+];
+
+// ROTA: Listar todas as empresas
+app.get('/api/empresas', async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Tenta buscar do banco (Prisma), se falhar usa o mock
+    if (typeof prisma !== 'undefined' && prisma.company) {
+      const dbEmpresas = await prisma.company.findMany({ orderBy: { name: 'asc' } });
+      res.status(200).json(dbEmpresas);
+      return;
+    }
+    res.status(200).json(empresasMock);
+  } catch (error) {
+    res.status(200).json(empresasMock);
+  }
+});
+
+// ROTA: Cadastrar nova empresa
+app.post('/api/empresas', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { nome, status } = req.body;
+    if (!nome) {
+      res.status(400).json({ message: 'Nome da empresa é obrigatório.' });
+      return;
+    }
+
+    const novaEmpresa = {
+      id: Date.now().toString(),
+      nome,
+      status: status || 'Em Contratação',
+      createdAt: new Date().toISOString(),
+    };
+
+    empresasMock.unshift(novaEmpresa);
+    res.status(201).json({ message: 'Empresa cadastrada com sucesso.', empresa: novaEmpresa });
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao cadastrar empresa.' });
+  }
+});
+
+// ROTA: Atualizar Status do Contrato da Empresa
+app.put('/api/empresas/:id', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { status, nome } = req.body;
+
+    empresasMock = empresasMock.map((emp) =>
+      emp.id === id ? { ...emp, status: status || emp.status, nome: nome || emp.nome } : emp
+    );
+
+    res.status(200).json({ message: 'Status da empresa atualizado com sucesso.' });
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao atualizar empresa.' });
+  }
+});

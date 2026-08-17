@@ -1,11 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
+
+interface EmpresaAtiva {
+  id: string;
+  nome: string;
+  status?: string;
+}
 
 export default function LoginPage() {
   const [isRegister, setIsRegister] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingEmpresas, setLoadingEmpresas] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Estados do formulário
@@ -15,8 +22,41 @@ export default function LoginPage() {
   const [empresa, setEmpresa] = useState('');
   const [perfil, setPerfil] = useState('USER');
 
-  // URL fixa do Render para evitar problemas de cache da Vercel
+  // Lista de empresas parceiras ativas
+  const [empresasAtivas, setEmpresasAtivas] = useState<EmpresaAtiva[]>([]);
+
+  // URL da API
   const API_URL = 'https://api-iez-partner-hub.onrender.com';
+
+  // Busca parceiros ativos para popular a lista suspensa (Picklist)
+  useEffect(() => {
+    async function fetchEmpresasAtivas() {
+      setLoadingEmpresas(true);
+      try {
+        const res = await fetch(`${API_URL}/api/empresas`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            // Regra de Negócio: Filtra apenas empresas com contrato "Ativo"
+            const ativas = data.filter((emp: EmpresaAtiva) => emp.status === 'Ativo');
+            setEmpresasAtivas(ativas);
+            if (ativas.length > 0) {
+              setEmpresa(ativas[0].nome);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Servidor indisponível para carregar parceiros ativos. Usando fallback local.');
+        const fallbackAtivas: EmpresaAtiva[] = [{ id: '1', nome: 'NetSpeed' }];
+        setEmpresasAtivas(fallbackAtivas);
+        setEmpresa('NetSpeed');
+      } finally {
+        setLoadingEmpresas(false);
+      }
+    }
+
+    fetchEmpresasAtivas();
+  }, []);
 
   // --- Função de LOGIN ---
   const handleLogin = async (e: React.FormEvent) => {
@@ -25,11 +65,9 @@ export default function LoginPage() {
     setMessage(null);
 
     try {
-      // CORREÇÃO 1: Rota ajustada para /api/auth/login
       const res = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // CORREÇÃO 2: Chave ajustada para "senha" (em vez de password)
         body: JSON.stringify({ email, senha }),
       });
 
@@ -41,10 +79,9 @@ export default function LoginPage() {
 
       setMessage({ type: 'success', text: 'Login realizado! Redirecionando...' });
 
-      // Salva os dados de sessão no LocalStorage
       if (data.user) {
         localStorage.setItem('iez_user', JSON.stringify(data.user));
-        localStorage.setItem('user', JSON.stringify(data.user)); // Fallback para componentes antigos
+        localStorage.setItem('user', JSON.stringify(data.user));
       }
       if (data.token) {
         localStorage.setItem('iez_token', data.token);
@@ -64,15 +101,19 @@ export default function LoginPage() {
   // --- Função de CADASTRO ---
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!empresa) {
+      setMessage({ type: 'error', text: 'Selecione uma empresa parceira com contrato ativo.' });
+      return;
+    }
+
     setLoading(true);
     setMessage(null);
 
     try {
-      // CORREÇÃO 3: Rota ajustada para /api/solicitacoes
       const res = await fetch(`${API_URL}/api/solicitacoes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // CORREÇÃO 4: Chaves ajustadas para nome, empresa e senha
         body: JSON.stringify({ nome, email, empresa, senha, perfil }),
       });
 
@@ -83,12 +124,14 @@ export default function LoginPage() {
       }
 
       setMessage({ type: 'success', text: 'Cadastro realizado com sucesso! Aguardando aprovação.' });
-      
+
       // Limpa os campos após sucesso
       setNome('');
-      setEmpresa('');
       setSenha('');
       setPerfil('USER');
+      if (empresasAtivas.length > 0) {
+        setEmpresa(empresasAtivas[0].nome);
+      }
     } catch (err: any) {
       setMessage({
         type: 'error',
@@ -103,10 +146,13 @@ export default function LoginPage() {
     setIsRegister(!isRegister);
     setMessage(null);
     setSenha('');
+    if (empresasAtivas.length > 0 && !empresa) {
+      setEmpresa(empresasAtivas[0].nome);
+    }
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4 font-sans">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4 font-sans selection:bg-orange-100 selection:text-orange-900">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-100 p-8 relative">
         
         {/* Cabeçalho do Formulário */}
@@ -161,21 +207,39 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-blue-50/30 border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all"
+              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all"
               required
             />
           </div>
 
+          {/* Seleção de Empresa Parceira (Apenas Parceiros com Contrato Ativo) */}
           {isRegister && (
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Empresa Parceira *</label>
-              <input
-                type="text"
-                value={empresa}
-                onChange={(e) => setEmpresa(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all"
-                required
-              />
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                Empresa Parceira *
+              </label>
+              {loadingEmpresas ? (
+                <div className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm bg-gray-50 text-gray-400 font-medium">
+                  Carregando empresas ativas...
+                </div>
+              ) : empresasAtivas.length > 0 ? (
+                <select
+                  value={empresa}
+                  onChange={(e) => setEmpresa(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all bg-white font-medium text-gray-800"
+                  required
+                >
+                  {empresasAtivas.map((emp) => (
+                    <option key={emp.id} value={emp.nome}>
+                      {emp.nome}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 font-medium">
+                  Nenhuma empresa parceira com contrato ativo no momento. Entre em contato com a iez! telecom para solicitar a liberação do cadastro.
+                </div>
+              )}
             </div>
           )}
 
@@ -234,8 +298,8 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full bg-orange-600 hover:bg-orange-700 active:bg-orange-800 text-white font-bold py-3 px-4 rounded-lg transition-colors mt-6 disabled:opacity-70"
+            disabled={loading || (isRegister && empresasAtivas.length === 0)}
+            className="w-full bg-orange-600 hover:bg-orange-700 active:bg-orange-800 text-white font-bold py-3 px-4 rounded-lg transition-colors mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Aguarde...' : isRegister ? 'Finalizar Solicitação' : 'Entrar no Portal'}
           </button>
