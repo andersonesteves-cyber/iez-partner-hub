@@ -1,5 +1,5 @@
 // src/app/page.tsx
-import DocumentosManager from './components/DocumentosManager';
+import DocumentosManager from '@/app/components/DocumentosManager';
 
 export default async function Home({
   searchParams,
@@ -11,7 +11,7 @@ export default async function Home({
   const query = resolvedParams?.q || '';
 
   return (
-    <main className="flex-1 p-8">
+    <main className="flex-1 p-8 bg-gray-50 min-h-screen">
       {/* O DocumentosManager recebe a query da URL e filtra internamente */}
       <DocumentosManager searchQuery={query} />
     </main>
