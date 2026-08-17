@@ -16,7 +16,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api-iez-partner-hub.
 
 const USUARIOS_PADRAO: Usuario[] = [
   { id: '1', nome: 'Anderson Luiz Fernandes Esteves', email: 'anderson.esteves@iez.com.br', empresa: 'IEZ! TELECOM', role: 'ADMIN', status: 'ATIVO' },
-  { id: '2', nome: 'Renato Pereira Soares', email: 'renato.soares@iez.com.br', empresa: 'iez! Telecom', role: 'ADMIN', status: 'ATIVO' },
+  { id: '2', nome: 'Renato Pereira Soares', email: 'renato.soares@iez.com.br', empresa: 'iez! Telecom', role: 'ADMIN', status: 'PENDENTE' },
 ];
 
 export default function GestaoAcessosPage() {
@@ -27,7 +27,7 @@ export default function GestaoAcessosPage() {
   const [filtroPerfil, setFiltroPerfil] = useState('TODOS');
   const [currentUser, setCurrentUser] = useState<any>(null);
 
-  // Modal de Criação de Usuário
+  // Modal de Criação
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [novoNome, setNovoNome] = useState('');
   const [novoEmail, setNovoEmail] = useState('');
@@ -60,7 +60,7 @@ export default function GestaoAcessosPage() {
       } catch (e) {}
     }
 
-    // Leitura inicial imediata do cache local para resposta rápida na UI
+    // Carrega prioritariamente o cache local do navegador
     const salvosLocais = localStorage.getItem('iez_usuarios');
     if (salvosLocais) {
       try {
@@ -91,14 +91,25 @@ export default function GestaoAcessosPage() {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
-          // Mescla itens vindos da API com novidades cadastradas localmente
           const salvosLocais = localStorage.getItem('iez_usuarios');
           const locais: Usuario[] = salvosLocais ? JSON.parse(salvosLocais) : [];
 
-          const idsApi = new Set(data.map((u: any) => String(u.id)));
-          const novosApenasLocais = locais.filter((l) => !idsApi.has(String(l.id)));
+          // Preserva alterações locais (como aprovações) sobrepondo os dados da API se existirem
+          const mapaLocais = new Map(locais.map((u) => [u.id, u]));
 
-          const listaConsolidada = [...novosApenasLocais, ...data];
+          const listaConsolidada = data.map((uApi: Usuario) => {
+            const local = mapaLocais.get(uApi.id);
+            return local || uApi;
+          });
+
+          // Adiciona novos usuários locais que ainda não estejam na API
+          const idsApi = new Set(data.map((u: any) => String(u.id)));
+          locais.forEach((l) => {
+            if (!idsApi.has(String(l.id)) && !listaConsolidada.some((x) => x.id === l.id)) {
+              listaConsolidada.unshift(l);
+            }
+          });
+
           atualizarEstadoLocal(listaConsolidada);
         }
       }
@@ -152,9 +163,7 @@ export default function GestaoAcessosPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(novoUsuario),
       });
-    } catch (err) {
-      console.warn('Servidor offline. Usuário registrado localmente.');
-    }
+    } catch (err) {}
   };
 
   const handleAlterarStatus = async (id: string, novoStatus: 'ATIVO' | 'BLOQUEADO') => {
@@ -326,7 +335,7 @@ export default function GestaoAcessosPage() {
                     <td className="py-3.5 px-4 text-right space-x-1.5">
                       {u.status === 'PENDENTE' && (
                         <>
-                          <button onClick={() => handleAlterarStatus(u.id, 'ATIVO')} className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-lg">
+                          <button onClick={() => handleAlterarStatus(u.id, 'ATIVO')} className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-lg shadow-sm">
                             Aprovar
                           </button>
                           <button onClick={() => handleAlterarStatus(u.id, 'BLOQUEADO')} className="px-3 py-1.5 border border-gray-200 text-red-600 hover:bg-red-50 font-bold text-xs rounded-lg">
