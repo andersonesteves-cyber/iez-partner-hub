@@ -1,18 +1,17 @@
-// src/app/page.tsx
-import DocumentosManager from '@/app/components/DocumentosManager';
+// app/page.tsx
+import DocumentosManager from './components/DocumentosManager';
 
 export default async function Home({
   searchParams,
 }: {
   searchParams: Promise<{ q?: string }>
 }) {
-  // No Next.js 15, searchParams é uma Promise, então precisamos aguardar (await)
+  // No Next.js 15, searchParams é uma Promise
   const resolvedParams = await searchParams;
   const query = resolvedParams?.q || '';
 
   return (
     <main className="flex-1 p-8 bg-gray-50 min-h-screen">
-      {/* O DocumentosManager recebe a query da URL e filtra internamente */}
       <DocumentosManager searchQuery={query} />
     </main>
   );
