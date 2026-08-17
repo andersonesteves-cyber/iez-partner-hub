@@ -140,6 +140,7 @@ export default function DocumentosManager({ searchQuery = '' }: DocumentosManage
       {/* MODAL DE CRIAÇÃO */}
       {isModalOpen && (
         <NovoDocumentoModal
+          isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           onSave={handleAdicionarDocumento}
         />
