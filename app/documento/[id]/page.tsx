@@ -31,7 +31,7 @@ export default function DocumentoReaderPage({ params }: { params: Promise<{ id: 
     setIsLoading(true);
     fetch(`${API_URL}/api/documentos/${id}`)
       .then((res) => {
-        if (!res.ok) throw new Error('Documento não encontrado na API');
+        if (!res.ok) throw new Error('Documento não encontrado');
         return res.json();
       })
       .then((data: Documento) => {
@@ -42,7 +42,7 @@ export default function DocumentoReaderPage({ params }: { params: Promise<{ id: 
         }
       })
       .catch((err) => {
-        console.error('Erro ao buscar detalhes:', err);
+        console.error('Erro ao buscar documento:', err);
       })
       .finally(() => {
         setIsLoading(false);
@@ -65,7 +65,7 @@ export default function DocumentoReaderPage({ params }: { params: Promise<{ id: 
       <div className="min-h-screen bg-gray-50 flex items-center justify-center font-sans">
         <div className="text-center bg-white p-8 rounded-xl border border-gray-200 shadow-sm max-w-md">
           <h1 className="text-xl font-bold text-gray-900 mb-2">Documento não encontrado</h1>
-          <p className="text-sm text-gray-500 mb-6">O arquivo solicitado não existe ou foi removido do servidor.</p>
+          <p className="text-sm text-gray-500 mb-6">O arquivo solicitado não foi localizado no servidor.</p>
           <Link href="/" className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2.5 px-5 rounded-lg text-sm transition-colors">
             ← Voltar para o início
           </Link>
@@ -74,7 +74,7 @@ export default function DocumentoReaderPage({ params }: { params: Promise<{ id: 
     );
   }
 
-  // Trata caminhos relativos concatenando com o endpoint do Render
+  // Concatena explicitamente a URL do Render quando o caminho retornado é relativo (/uploads/...)
   const fullPdfUrl = doc.pdfUrl.startsWith('http') ? doc.pdfUrl : `${API_URL}${doc.pdfUrl}`;
 
   return (
@@ -125,43 +125,8 @@ export default function DocumentoReaderPage({ params }: { params: Promise<{ id: 
       </header>
 
       <div className="flex flex-1 max-w-7xl w-full mx-auto p-6 gap-6">
-        {modoView === 'leitura' && doc.secoes && doc.secoes.length > 0 && (
-          <aside className="w-80 flex-shrink-0">
-            <div className="sticky top-24 bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-              <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 px-2">Índice do Documento</h2>
-              <nav className="space-y-1">
-                {doc.secoes.map((secao) => (
-                  <button
-                    key={secao.id}
-                    onClick={() => {
-                      setSecaoAtiva(secao.id);
-                      document.getElementById(secao.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }}
-                    className={`w-full text-left text-sm py-2 px-3 rounded-lg transition-colors flex items-center justify-between font-medium ${
-                      secaoAtiva === secao.id ? 'bg-orange-50 text-orange-600 font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    }`}
-                  >
-                    <span className="truncate">{secao.titulo}</span>
-                  </button>
-                ))}
-              </nav>
-            </div>
-          </aside>
-        )}
-
-        <main className={`flex-1 bg-white rounded-xl border border-gray-200 shadow-sm min-h-[75vh] overflow-hidden ${modoView === 'leitura' ? 'p-8' : 'p-2'}`}>
-          {modoView === 'leitura' ? (
-            <article className="space-y-10 max-w-3xl mx-auto">
-              {doc.secoes?.map((secao) => (
-                <section key={secao.id} id={secao.id} className="scroll-mt-28 border-b border-gray-100 pb-8 last:border-none">
-                  <h2 className="text-xl font-bold text-gray-900 mb-3">{secao.titulo}</h2>
-                  <p className="text-gray-600 leading-relaxed whitespace-pre-line">{secao.conteudo}</p>
-                </section>
-              ))}
-            </article>
-          ) : (
-            <iframe src={`${fullPdfUrl}#toolbar=0`} className="w-full h-full min-h-[75vh] rounded-lg border-none" title={doc.titulo} />
-          )}
+        <main className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm min-h-[75vh] overflow-hidden p-2">
+          <iframe src={`${fullPdfUrl}#toolbar=0`} className="w-full h-full min-h-[75vh] rounded-lg border-none" title={doc.titulo} />
         </main>
       </div>
     </div>
