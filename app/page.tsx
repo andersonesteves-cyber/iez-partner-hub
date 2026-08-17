@@ -1,18 +1,19 @@
-import UsuariosManager from '@/components/UsuariosManager';
+// src/app/page.tsx
+import DocumentosManager from './components/DocumentosManager';
 
-export default function UsuariosPage() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>
+}) {
+  // No Next.js 15, searchParams é uma Promise, então precisamos aguardar (await)
+  const resolvedParams = await searchParams;
+  const query = resolvedParams?.q || '';
+
   return (
-    <main className="flex-1 bg-gray-50 min-h-screen p-6 md:p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Gestão de Acessos</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Aprove ou bloqueie os parceiros que solicitaram acesso ao portal.
-          </p>
-        </div>
-        
-        <UsuariosManager />
-      </div>
+    <main className="flex-1 p-8">
+      {/* O DocumentosManager recebe a query da URL e filtra internamente */}
+      <DocumentosManager searchQuery={query} />
     </main>
   );
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 interface UserData {
   id?: string
@@ -15,8 +15,19 @@ interface UserData {
 
 export default function TopHeader() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  
+  // Lê a query atual da URL para manter o input sincronizado
+  const currentQuery = searchParams.get('q') || ''
+  
   const [user, setUser] = useState<UserData | null>(null)
   const [carregando, setCarregando] = useState(true)
+  const [searchTerm, setSearchTerm] = useState(currentQuery)
+
+  // Sincroniza o input com a URL se a URL mudar por outro componente (ex: Sidebar)
+  useEffect(() => {
+    setSearchTerm(currentQuery)
+  }, [currentQuery])
 
   useEffect(() => {
     // Busca na nova chave 'iez_user' (usada no LoginForm atual) ou nas antigas
@@ -41,6 +52,17 @@ export default function TopHeader() {
     localStorage.removeItem('token')
     
     router.push('/login')
+  }
+
+  // Função para disparar a busca ao apertar Enter
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      if (searchTerm.trim()) {
+        router.push(`/?q=${encodeURIComponent(searchTerm.trim())}`)
+      } else {
+        router.push('/')
+      }
+    }
   }
 
   // Tratamento dinâmico: mostra "Carregando..." antes de ler os dados
@@ -71,6 +93,9 @@ export default function TopHeader() {
           </span>
           <input
             type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Buscar processos, PDFs, vídeos (Aperte Enter)..."
             className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white transition-all"
           />
