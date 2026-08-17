@@ -1,5 +1,5 @@
 // app/page.tsx
-import DocumentosManager from './components/DocumentosManager';
+import DocumentosManager from '../components/DocumentosManager';
 
 export default async function Home({
   searchParams,
