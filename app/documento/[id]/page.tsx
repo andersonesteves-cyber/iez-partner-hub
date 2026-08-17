@@ -22,7 +22,7 @@ export default function DocumentoReaderPage({ params }: { params: Promise<{ id: 
   const { id } = use(params);
   const [doc, setDoc] = useState<Documento | null>(null);
   const [secaoAtiva, setSecaoAtiva] = useState<string>('');
-  const [modoView, setModoView] = useState<'leitura' | 'pdf'>('pdf'); // Agora o padrão é PDF
+  const [modoView, setModoView] = useState<'leitura' | 'pdf'>('pdf');
   const [isLoading, setIsLoading] = useState(true);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -31,18 +31,18 @@ export default function DocumentoReaderPage({ params }: { params: Promise<{ id: 
     setIsLoading(true);
     fetch(`${API_URL}/api/documentos/${id}`)
       .then((res) => {
-        if (!res.ok) throw new Error('Documento não encontrado');
+        if (!res.ok) throw new Error('Documento não encontrado na API');
         return res.json();
       })
       .then((data: Documento) => {
         setDoc(data);
         if (data.secoes && data.secoes.length > 0) {
           setSecaoAtiva(data.secoes[0].id);
-          setModoView('leitura'); // Muda pra leitura se tiver texto extraído
+          setModoView('leitura');
         }
       })
       .catch((err) => {
-        console.error('Erro ao buscar documento:', err);
+        console.error('Erro ao buscar detalhes:', err);
       })
       .finally(() => {
         setIsLoading(false);
@@ -54,7 +54,7 @@ export default function DocumentoReaderPage({ params }: { params: Promise<{ id: 
       <div className="min-h-screen bg-gray-50 flex items-center justify-center font-sans">
         <div className="flex flex-col items-center gap-3">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-600"></div>
-          <p className="text-sm font-medium text-gray-500">Carregando documento...</p>
+          <p className="text-sm font-medium text-gray-500">Carregando documento do iez! Hub...</p>
         </div>
       </div>
     );
@@ -63,22 +63,25 @@ export default function DocumentoReaderPage({ params }: { params: Promise<{ id: 
   if (!doc) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center font-sans">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">Documento não encontrado</h1>
-          <Link href="/" className="text-orange-600 hover:underline">← Voltar para o início</Link>
+        <div className="text-center bg-white p-8 rounded-xl border border-gray-200 shadow-sm max-w-md">
+          <h1 className="text-xl font-bold text-gray-900 mb-2">Documento não encontrado</h1>
+          <p className="text-sm text-gray-500 mb-6">O arquivo solicitado não existe ou foi removido do servidor.</p>
+          <Link href="/" className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2.5 px-5 rounded-lg text-sm transition-colors">
+            ← Voltar para o início
+          </Link>
         </div>
       </div>
     );
   }
 
-  // CORREÇÃO CRÍTICA DO 404: Garante que a URL do PDF aponta para o backend
+  // Trata caminhos relativos concatenando com o endpoint do Render
   const fullPdfUrl = doc.pdfUrl.startsWith('http') ? doc.pdfUrl : `${API_URL}${doc.pdfUrl}`;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans text-gray-800">
       <header className="sticky top-0 z-20 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-4">
-          <Link href="/" className="text-sm font-medium text-gray-500 hover:text-orange-600 transition-colors flex items-center gap-1">
+          <Link href="/" className="text-sm font-semibold text-gray-500 hover:text-orange-600 transition-colors flex items-center gap-1">
             ← Voltar para Início
           </Link>
           <span className="text-gray-300">|</span>
@@ -94,7 +97,7 @@ export default function DocumentoReaderPage({ params }: { params: Promise<{ id: 
               onClick={() => setModoView('leitura')}
               disabled={!doc.secoes || doc.secoes.length === 0}
               className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                modoView === 'leitura' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed'
+                modoView === 'leitura' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-gray-900 disabled:opacity-40 disabled:cursor-not-allowed'
               }`}
             >
               Leitura Adaptativa
@@ -109,13 +112,12 @@ export default function DocumentoReaderPage({ params }: { params: Promise<{ id: 
             </button>
           </div>
 
-          {/* O Download agora usa a URL absoluta */}
           <a
             href={fullPdfUrl}
             download
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+            className="bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
           >
             📥 Baixar PDF
           </a>
@@ -147,7 +149,7 @@ export default function DocumentoReaderPage({ params }: { params: Promise<{ id: 
           </aside>
         )}
 
-        <main className={`flex-1 bg-white rounded-xl border border-gray-200 p-2 shadow-sm min-h-[75vh] ${modoView === 'leitura' ? 'p-8' : ''}`}>
+        <main className={`flex-1 bg-white rounded-xl border border-gray-200 shadow-sm min-h-[75vh] overflow-hidden ${modoView === 'leitura' ? 'p-8' : 'p-2'}`}>
           {modoView === 'leitura' ? (
             <article className="space-y-10 max-w-3xl mx-auto">
               {doc.secoes?.map((secao) => (
@@ -158,7 +160,7 @@ export default function DocumentoReaderPage({ params }: { params: Promise<{ id: 
               ))}
             </article>
           ) : (
-            <iframe src={`${fullPdfUrl}#toolbar=0`} className="w-full h-full rounded-lg" title={doc.titulo} />
+            <iframe src={`${fullPdfUrl}#toolbar=0`} className="w-full h-full min-h-[75vh] rounded-lg border-none" title={doc.titulo} />
           )}
         </main>
       </div>
