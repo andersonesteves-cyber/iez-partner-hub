@@ -29,6 +29,15 @@ export default function NovoDocumentoModal({ isOpen, onClose, onSave }: NovoDocu
 
   const API_URL = 'https://api-iez-partner-hub.onrender.com';
 
+  const aplicarFallback = () => {
+    const fallbackList = [
+      { id: '1', nome: 'Zamix', status: 'Ativo' },
+      { id: '2', nome: 'NetSpeed', status: 'Ativo' },
+    ];
+    setEmpresasAtivas(fallbackList);
+    setEmpresaRestrita(fallbackList[0].nome);
+  };
+
   useEffect(() => {
     if (isOpen) {
       fetchEmpresas();
@@ -41,30 +50,30 @@ export default function NovoDocumentoModal({ isOpen, onClose, onSave }: NovoDocu
       const res = await fetch(`${API_URL}/api/empresas`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) {
-          // Normaliza campos nome/name e valida status 'Ativo'
+        if (Array.isArray(data) && data.length > 0) {
           const ativas = data
             .map((e: any) => ({
-              id: e.id,
+              id: String(e.id),
               nome: e.nome || e.name || 'Empresa Sem Nome',
-              status: e.status || 'Ativo',
+              status: String(e.status || 'Ativo'),
             }))
             .filter((e) => e.status.toLowerCase() === 'ativo');
 
-          setEmpresasAtivas(ativas);
           if (ativas.length > 0) {
+            setEmpresasAtivas(ativas);
             setEmpresaRestrita(ativas[0].nome);
+          } else {
+            aplicarFallback();
           }
+        } else {
+          aplicarFallback();
         }
+      } else {
+        aplicarFallback();
       }
     } catch (err) {
-      console.warn('Falha ao buscar empresas no modal, aplicando fallback.');
-      const fallback = [
-        { id: '1', nome: 'Zamix', status: 'Ativo' },
-        { id: '2', nome: 'NetSpeed', status: 'Ativo' },
-      ];
-      setEmpresasAtivas(fallback);
-      setEmpresaRestrita('Zamix');
+      console.warn('Falha na comunicação com a API. Aplicando empresas padrão.');
+      aplicarFallback();
     } finally {
       setLoadingEmpresas(false);
     }
@@ -96,6 +105,8 @@ export default function NovoDocumentoModal({ isOpen, onClose, onSave }: NovoDocu
   return (
     <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 font-sans selection:bg-orange-100 selection:text-orange-900">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto border border-gray-100">
+        
+        {/* CABEÇALHO DO MODAL */}
         <div className="p-6 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
           <h2 className="text-lg font-bold text-gray-900">Cadastrar Novo Documento</h2>
           <button
@@ -106,6 +117,7 @@ export default function NovoDocumentoModal({ isOpen, onClose, onSave }: NovoDocu
           </button>
         </div>
 
+        {/* FORMULÁRIO */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">Título do Documento *</label>
@@ -158,7 +170,7 @@ export default function NovoDocumentoModal({ isOpen, onClose, onSave }: NovoDocu
             </div>
           </div>
 
-          {/* Regra de Visibilidade com Picklist de Empresas */}
+          {/* VISIBILIDADE POR EMPRESA */}
           <div className="bg-gray-50/70 p-4 rounded-xl border border-gray-200/80 space-y-3">
             <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider">
               Regra de Visibilidade por Empresa
@@ -188,11 +200,12 @@ export default function NovoDocumentoModal({ isOpen, onClose, onSave }: NovoDocu
               </label>
             </div>
 
+            {/* SELEÇÃO DA EMPRESA */}
             {regraVisibilidade === 'restrita' && (
               <div className="pt-2">
                 {loadingEmpresas ? (
                   <div className="text-xs text-gray-400 py-2">Carregando lista de parceiros ativos...</div>
-                ) : empresasAtivas.length > 0 ? (
+                ) : (
                   <select
                     value={empresaRestrita}
                     onChange={(e) => setEmpresaRestrita(e.target.value)}
@@ -204,10 +217,6 @@ export default function NovoDocumentoModal({ isOpen, onClose, onSave }: NovoDocu
                       </option>
                     ))}
                   </select>
-                ) : (
-                  <p className="text-xs text-amber-700 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
-                    Nenhuma empresa parceira com contrato ativo cadastrada no momento.
-                  </p>
                 )}
               </div>
             )}
