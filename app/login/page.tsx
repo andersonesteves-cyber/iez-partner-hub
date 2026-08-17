@@ -61,7 +61,7 @@ export default function LoginPage() {
       ];
       setEmpresasAtivas(fallback);
       setEmpresa('Zamix');
-    } fontually {
+    } finally {
       setLoadingEmpresas(false);
     }
   };
