@@ -17,18 +17,19 @@ const EMPRESAS_INICIAIS: Empresa[] = [
 
 export default function ParceirosPage() {
   const [empresas, setEmpresas] = useState<Empresa[]>(EMPRESAS_INICIAIS);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
   // Modal de Novo Cadastramento
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [novoNome, setNovoNome] = useState('');
-  const [novoStatus, setNovoStatus] = useState<Empresa['status']>('Em Contratação');
+  const [novoStatus, setNovoStatus] = useState<Empresa['status']>('Ativo');
+
+  const API_URL = 'https://api-iez-partner-hub.onrender.com';
 
   const fetchEmpresas = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/empresas');
+      const res = await fetch(`${API_URL}/api/empresas`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
@@ -36,9 +37,7 @@ export default function ParceirosPage() {
         }
       }
     } catch (error) {
-      console.warn('Usando lista de fallback para parceiros.');
-    } finally {
-      setLoading(false);
+      console.warn('Usando lista de fallback local para parceiros.');
     }
   };
 
@@ -48,7 +47,7 @@ export default function ParceirosPage() {
 
   const handleUpdateStatus = async (id: string, status: Empresa['status']) => {
     try {
-      await fetch(`http://localhost:5000/api/empresas/${id}`, {
+      await fetch(`${API_URL}/api/empresas/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
@@ -71,7 +70,7 @@ export default function ParceirosPage() {
     };
 
     try {
-      await fetch('http://localhost:5000/api/empresas', {
+      await fetch(`${API_URL}/api/empresas`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nome: novoNome, status: novoStatus }),
@@ -80,7 +79,7 @@ export default function ParceirosPage() {
       setEmpresas([nova, ...empresas]);
       setIsModalOpen(false);
       setNovoNome('');
-      setNovoStatus('Em Contratação');
+      setNovoStatus('Ativo');
     } catch (error) {
       alert('Erro ao cadastrar empresa.');
     }
@@ -108,135 +107,131 @@ export default function ParceirosPage() {
   };
 
   return (
-    <main className="flex-1 w-full h-full bg-gray-50 p-6 md:p-8 overflow-y-auto font-sans">
-      <div className="max-w-7xl mx-auto">
-        
-        {/* Cabeçalho */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Gestão de Parceiros</h1>
-            <p className="text-sm text-gray-500 mt-1">Gerencie as empresas parceiras e os status de seus contratos.</p>
-          </div>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold text-xs px-4 py-2.5 rounded-lg shadow-sm transition-all"
-          >
-            <span>+</span> Novo Parceiro
-          </button>
+    <div className="w-full h-full font-sans">
+      {/* Cabeçalho */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Gestão de Parceiros</h1>
+          <p className="text-sm text-gray-500 mt-1">Cadastre e controle os contratos das empresas parceiras.</p>
         </div>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="inline-flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold text-xs px-4 py-2.5 rounded-lg shadow-sm transition-all"
+        >
+          <span>+</span> Novo Parceiro
+        </button>
+      </div>
 
-        {/* Filtros */}
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm mb-6 flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <input
-              type="text"
-              placeholder="Buscar por nome da empresa..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
-            />
-          </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="border border-gray-200 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white"
-          >
-            <option value="">Todos os Status de Contrato</option>
-            <option value="Em Contratação">Em Contratação</option>
-            <option value="Ativo">Ativo</option>
-            <option value="Suspenso">Suspenso</option>
-            <option value="Encerrado">Encerrado</option>
-          </select>
+      {/* Filtros */}
+      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm mb-6 flex flex-col md:flex-row gap-4">
+        <div className="flex-1">
+          <input
+            type="text"
+            placeholder="Buscar por nome da empresa..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+          />
         </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="border border-gray-200 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white font-medium"
+        >
+          <option value="">Todos os Status</option>
+          <option value="Ativo">Ativo</option>
+          <option value="Em Contratação">Em Contratação</option>
+          <option value="Suspenso">Suspenso</option>
+          <option value="Encerrado">Encerrado</option>
+        </select>
+      </div>
 
-        {/* Tabela de Empresas */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <table className="w-full text-left text-sm whitespace-nowrap">
-            <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
-              <tr>
-                <th className="px-6 py-4 font-semibold">Empresa Parceira</th>
-                <th className="px-6 py-4 font-semibold">Status do Contrato</th>
-                <th className="px-6 py-4 font-semibold text-right">Alterar Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredEmpresas.map((emp) => (
-                <tr key={emp.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 font-bold text-gray-900">{emp.nome}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${getStatusBadge(emp.status)}`}>
-                      {emp.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <select
-                      value={emp.status}
-                      onChange={(e) => handleUpdateStatus(emp.id, e.target.value as Empresa['status'])}
-                      className="text-xs border border-gray-200 rounded px-2 py-1 bg-white focus:ring-1 focus:ring-orange-500 outline-none font-medium"
-                    >
-                      <option value="Em Contratação">Em Contratação</option>
-                      <option value="Ativo">Ativo</option>
-                      <option value="Suspenso">Suspenso</option>
-                      <option value="Encerrado">Encerrado</option>
-                    </select>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Modal de Cadastro de Empresa */}
-        {isModalOpen && (
-          <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-lg w-full max-w-md p-6 border border-gray-100">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">Cadastrar Nova Empresa Parceira</h2>
-              <form onSubmit={handleCreateEmpresa} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Nome da Empresa *</label>
-                  <input
-                    type="text"
-                    value={novoNome}
-                    onChange={(e) => setNovoNome(e.target.value)}
-                    required
-                    placeholder="Ex: ISP Telecom Ltda"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Status Inicial do Contrato</label>
+      {/* Tabela de Empresas */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <table className="w-full text-left text-sm whitespace-nowrap">
+          <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
+            <tr>
+              <th className="px-6 py-4 font-semibold">Empresa Parceira</th>
+              <th className="px-6 py-4 font-semibold">Status do Contrato</th>
+              <th className="px-6 py-4 font-semibold text-right">Alterar Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {filteredEmpresas.map((emp) => (
+              <tr key={emp.id} className="hover:bg-gray-50 transition-colors">
+                <td className="px-6 py-4 font-bold text-gray-900">{emp.nome}</td>
+                <td className="px-6 py-4">
+                  <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${getStatusBadge(emp.status)}`}>
+                    {emp.status}
+                  </span>
+                </td>
+                <td className="px-6 py-4 text-right">
                   <select
-                    value={novoStatus}
-                    onChange={(e) => setNovoStatus(e.target.value as Empresa['status'])}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white"
+                    value={emp.status}
+                    onChange={(e) => handleUpdateStatus(emp.id, e.target.value as Empresa['status'])}
+                    className="text-xs border border-gray-200 rounded px-2 py-1 bg-white focus:ring-1 focus:ring-orange-500 outline-none font-medium"
                   >
-                    <option value="Em Contratação">Em Contratação</option>
                     <option value="Ativo">Ativo</option>
+                    <option value="Em Contratação">Em Contratação</option>
                     <option value="Suspenso">Suspenso</option>
                     <option value="Encerrado">Encerrado</option>
                   </select>
-                </div>
-                <div className="flex justify-end gap-3 mt-6">
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-lg"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 text-sm font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-lg"
-                  >
-                    Salvar Empresa
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-    </main>
+
+      {/* Modal de Cadastro de Empresa */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-md p-6 border border-gray-100">
+            <h2 className="text-lg font-bold text-gray-900 mb-4">Cadastrar Empresa Parceira</h2>
+            <form onSubmit={handleCreateEmpresa} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Nome da Empresa *</label>
+                <input
+                  type="text"
+                  value={novoNome}
+                  onChange={(e) => setNovoNome(e.target.value)}
+                  required
+                  placeholder="Ex: NetSpeed Telecom"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Status do Contrato</label>
+                <select
+                  value={novoStatus}
+                  onChange={(e) => setNovoStatus(e.target.value as Empresa['status'])}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white font-medium"
+                >
+                  <option value="Ativo">Ativo</option>
+                  <option value="Em Contratação">Em Contratação</option>
+                  <option value="Suspenso">Suspenso</option>
+                  <option value="Encerrado">Encerrado</option>
+                </select>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-lg"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-sm font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-lg"
+                >
+                  Salvar Empresa
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
