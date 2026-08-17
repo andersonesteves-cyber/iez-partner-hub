@@ -30,7 +30,6 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
             priority
           />
         </Link>
-        {/* Botão fechar no mobile */}
         {onClose && (
           <button
             onClick={onClose}
@@ -99,10 +98,10 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
           </div>
         </div>
 
-        {/* ADMINISTRAÇÃO */}
+        {/* ADMINISTRAÇÃO & RECURSOS */}
         <div>
           <p className="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
-            Administração
+            Administração & Atalhos
           </p>
           <div className="space-y-1">
             <Link
@@ -119,6 +118,13 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
             >
               Gestão de Parceiros
             </Link>
+            <Link
+              href="/links-uteis"
+              onClick={handleLinkClick}
+              className="block px-3 py-1.5 text-sm text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+            >
+              🔗 Links Úteis
+            </Link>
           </div>
         </div>
       </nav>
@@ -133,12 +139,10 @@ export default function Sidebar({ isMobileOpen = false, onClose }: SidebarProps)
 
   return (
     <>
-      {/* VERSÃO DESKTOP (Fixa na tela em monitores md+) */}
       <aside className="hidden md:flex w-64 bg-white border-r border-gray-100 flex-col shrink-0 z-20 h-screen font-sans">
         {menuContent}
       </aside>
 
-      {/* VERSÃO MOBILE (Gaveta Deslizante com Máscara Escura) */}
       {isMobileOpen && (
         <div
           className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-40 md:hidden transition-opacity"
