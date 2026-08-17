@@ -13,13 +13,12 @@ datasource db {
 model Documento {
   id                String   @id @default(uuid())
   titulo            String
+  resumo            String?  // <-- NOVO CAMPO ADICIONADO AQUI
   categoria         String
-  nivelAcesso       String   
-  regraVisibilidade String   
-  empresa           String?  
-  descricao         String?
-  arquivoUrl        String   
-  enviadoPor        String?  // <-- NOVA LINHA: Registra o nome de quem fez o upload
+  nivelAcesso       String   @default("TODOS")
+  regraVisibilidade String   @default("GERAL")
+  arquivoUrl        String
+  enviadoPor        String?
   criadoEm          DateTime @default(now())
   atualizadoEm      DateTime @updatedAt
 }
