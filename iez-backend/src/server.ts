@@ -16,19 +16,16 @@ const PORT = process.env.PORT || 5000;
 // ==========================================
 // CONFIGURAÇÃO DE UPLOAD (MULTER)
 // ==========================================
-// Garante que a pasta 'uploads' exista
 const uploadDir = path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Configura onde e com que nome o arquivo será salvo
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    // Adiciona a data atual no nome para evitar arquivos duplicados
     const safeName = file.originalname.replace(/\s+/g, '-');
     cb(null, `${Date.now()}-${safeName}`);
   }
@@ -40,14 +37,11 @@ const upload = multer({ storage });
 // ==========================================
 app.use(
   cors({
-    // Permite qualquer origem temporariamente para evitar bloqueios da Vercel
     origin: '*', 
     credentials: true,
   })
 );
 app.use(express.json());
-
-// Transforma a pasta 'uploads' numa rota pública para podermos acessar os PDFs via URL
 app.use('/uploads', express.static(uploadDir));
 
 // ==========================================
@@ -58,7 +52,7 @@ app.get('/', (req: Request, res: Response) => {
   res.status(200).json({ status: 'OK', message: 'API iez! Partner Hub rodando 🚀' });
 });
 
-// --- Rota de Login (MANTIDA IGUAL) ---
+// --- Rota de Login ---
 app.post('/api/auth/login', async (req: Request, res: Response): Promise<void> => {
   try {
     const email = req.body.email?.trim();
@@ -87,7 +81,7 @@ app.post('/api/auth/login', async (req: Request, res: Response): Promise<void> =
   }
 });
 
-// --- Rota de Cadastro (MANTIDA IGUAL) ---
+// --- Rota de Cadastro ---
 app.post('/api/solicitacoes', async (req: Request, res: Response): Promise<void> => {
   try {
     const email = req.body.email?.trim();
@@ -109,7 +103,7 @@ app.post('/api/solicitacoes', async (req: Request, res: Response): Promise<void>
   }
 });
 
-// --- Rota de Documentos (Listagem) ---
+// --- Rota de Documentos (Listagem com Resumo) ---
 app.get('/api/documentos', async (req: Request, res: Response): Promise<void> => {
   try {
     const documentos = await prisma.documento.findMany({
@@ -119,10 +113,11 @@ app.get('/api/documentos', async (req: Request, res: Response): Promise<void> =>
     const docsFormatados = documentos.map(doc => ({
       id: doc.id,
       titulo: doc.titulo,
+      resumo: doc.resumo || '',
       categoria: doc.categoria,
-      pdfUrl: doc.arquivoUrl, // Alinhado com a tipagem do frontend que espera pdfUrl
-      dataCriacao: doc.atualizadoEm.toISOString(), // Ajustado para o formato do Card
-      enviadoPor: doc.enviadoPor
+      pdfUrl: doc.arquivoUrl,
+      dataCriacao: doc.atualizadoEm.toISOString(),
+      enviadoPor: doc.enviadoPor || 'IEZ! Telecom'
     }));
 
     res.status(200).json(docsFormatados);
@@ -131,58 +126,84 @@ app.get('/api/documentos', async (req: Request, res: Response): Promise<void> =>
   }
 });
 
-// --- NOVA ROTA: UPLOAD DE NOVO DOCUMENTO (CORRIGIDA) ---
-// O frontend envia a chave 'file', então o multer precisa interceptar 'file'
+// --- ROTA DE DETALHES DO DOCUMENTO (POR ID) ---
+app.get('/api/documentos/:id', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    const doc = await prisma.documento.findUnique({
+      where: { id }
+    });
+
+    if (!doc) {
+      res.status(404).json({ message: 'Documento não encontrado no banco de dados.' });
+      return;
+    }
+
+    res.status(200).json({
+      id: doc.id,
+      titulo: doc.titulo,
+      resumo: doc.resumo || '',
+      categoria: doc.categoria,
+      pdfUrl: doc.arquivoUrl,
+      dataCriacao: doc.atualizadoEm.toISOString(),
+      enviadoPor: doc.enviadoPor || 'IEZ! Telecom',
+      secoes: []
+    });
+  } catch (error) {
+    console.error('Erro ao buscar documento por ID:', error);
+    res.status(500).json({ message: 'Erro interno ao buscar o documento.' });
+  }
+});
+
+// --- CRIAÇÃO DE NOVO DOCUMENTO (COM RESUMO E EMPRESA) ---
 app.post('/api/documentos', upload.single('file'), async (req: Request, res: Response): Promise<void> => {
   try {
-    // Alinhado com os nomes exatos enviados pelo Modal
-    const { titulo, categoria, nivelAcesso, visibilidade, empresa } = req.body;
+    const { titulo, resumo, categoria, nivelAcesso, visibilidade, empresa } = req.body;
     const arquivo = req.file;
 
     if (!arquivo) {
       res.status(400).json({ message: 'Nenhum arquivo enviado.' }); return;
     }
 
-    // Cria a URL pública para acessar o arquivo (rota /uploads)
     const arquivoUrl = `/uploads/${arquivo.filename}`;
 
     const novoDocumento = await prisma.documento.create({
       data: {
         titulo,
+        resumo: resumo || '',
         categoria,
         nivelAcesso: nivelAcesso || 'Partner (Todos)',
-        // No schema está regraVisibilidade, mas o frontend enviou 'visibilidade'
-        regraVisibilidade: visibilidade === 'restrita' ? 'RESTRITA' : 'GERAL',
+        regraVisibilidade: visibilidade === 'restrita' ? `RESTRITA:${empresa || ''}` : 'GERAL',
         arquivoUrl,
-        enviadoPor: 'Admin' // No futuro, puxar do usuário logado no Token JWT
+        enviadoPor: 'Admin'
       }
     });
 
-    // Mapeamos para que o Frontend (DocumentosManager) renderize instantaneamente
-    const docFormatado = {
+    res.status(201).json({
       id: novoDocumento.id,
       titulo: novoDocumento.titulo,
+      resumo: novoDocumento.resumo,
       categoria: novoDocumento.categoria,
       pdfUrl: novoDocumento.arquivoUrl,
-      dataCriacao: novoDocumento.atualizadoEm.toISOString()
-    };
-
-    res.status(201).json(docFormatado);
+      dataCriacao: novoDocumento.atualizadoEm.toISOString(),
+      enviadoPor: novoDocumento.enviadoPor || 'Admin'
+    });
   } catch (error) {
     console.error('Erro no upload:', error);
     res.status(500).json({ message: 'Erro ao salvar o documento.' });
   }
 });
 
-// --- NOVA ROTA: EDIÇÃO DE DOCUMENTO EXISTENTE ---
+// --- EDIÇÃO DE DOCUMENTO (INCLUINDO RESUMO) ---
 app.put('/api/documentos/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { titulo, categoria } = req.body;
+    const { titulo, categoria, resumo } = req.body;
 
     const documentoAtualizado = await prisma.documento.update({
       where: { id },
-      data: { titulo, categoria }
+      data: { titulo, categoria, resumo }
     });
 
     res.status(200).json(documentoAtualizado);
@@ -218,7 +239,7 @@ app.get('/api/usuarios', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// --- Rota de Gestão de Acessos (Aprovar/Bloquear/Alterar Status) ---
+// --- Rota de Gestão de Acessos (Alterar Status) ---
 app.put('/api/usuarios/:id/status', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
@@ -234,7 +255,6 @@ app.put('/api/usuarios/:id/status', async (req: Request, res: Response): Promise
       select: { id: true, nome: true, status: true, role: true }
     });
 
-    console.log(`[GESTAO] Usuário ${usuarioAtualizado.nome} alterado para status: ${usuarioAtualizado.status}`);
     res.status(200).json({ message: 'Acesso atualizado com sucesso!', usuario: usuarioAtualizado });
   } catch (error) {
     console.error('[GESTAO ERRO] Erro ao atualizar usuário:', error);
