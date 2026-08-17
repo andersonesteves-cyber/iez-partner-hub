@@ -1,236 +1,243 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
-interface Documento {
+interface Empresa {
   id: string;
-  titulo: string;
-  categoria: string;
-  resumo?: string;
-  dataCriacao?: string;
-  enviadoPor?: string;
+  nome: string;
+  name?: string;
+  status: string;
 }
 
 interface NovoDocumentoModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (novoDoc: Documento) => void;
+  onSave: (documento: any) => void;
 }
 
 export default function NovoDocumentoModal({ isOpen, onClose, onSave }: NovoDocumentoModalProps) {
   const [titulo, setTitulo] = useState('');
-  const [resumo, setResumo] = useState('');
+  const [descricao, setDescricao] = useState('');
   const [categoria, setCategoria] = useState('Manuais');
-  const [novaCategoria, setNovaCategoria] = useState('');
-  const [criandoCategoria, setCriandoCategoria] = useState(false);
   const [nivelAcesso, setNivelAcesso] = useState('Partner (Todos)');
-  const [visibilidade, setVisibilidade] = useState('publica');
-  const [empresa, setEmpresa] = useState('');
+  const [regraVisibilidade, setRegraVisibilidade] = useState<'publica' | 'restrita'>('publica');
+  const [empresaRestrita, setEmpresaRestrita] = useState('');
   const [arquivo, setArquivo] = useState<File | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  const [empresasAtivas, setEmpresasAtivas] = useState<Empresa[]>([]);
+  const [loadingEmpresas, setLoadingEmpresas] = useState(false);
 
-  if (!isOpen) return null;
+  const API_URL = 'https://api-iez-partner-hub.onrender.com';
 
-  const categoriaFinal = criandoCategoria ? novaCategoria : categoria;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!titulo || !arquivo || (criandoCategoria && !novaCategoria)) {
-      alert('Por favor, preencha todos os campos obrigatórios.');
-      return;
+  useEffect(() => {
+    if (isOpen) {
+      fetchEmpresas();
     }
+  }, [isOpen]);
 
-    setIsSubmitting(true);
+  const fetchEmpresas = async () => {
+    setLoadingEmpresas(true);
     try {
-      const formData = new FormData();
-      formData.append('titulo', titulo);
-      formData.append('resumo', resumo);
-      formData.append('categoria', categoriaFinal);
-      formData.append('nivelAcesso', nivelAcesso);
-      formData.append('visibilidade', visibilidade);
-      if (visibilidade === 'restrita') {
-        formData.append('empresa', empresa);
+      const res = await fetch(`${API_URL}/api/empresas`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          // Normaliza campos nome/name e valida status 'Ativo'
+          const ativas = data
+            .map((e: any) => ({
+              id: e.id,
+              nome: e.nome || e.name || 'Empresa Sem Nome',
+              status: e.status || 'Ativo',
+            }))
+            .filter((e) => e.status.toLowerCase() === 'ativo');
+
+          setEmpresasAtivas(ativas);
+          if (ativas.length > 0) {
+            setEmpresaRestrita(ativas[0].nome);
+          }
+        }
       }
-      formData.append('file', arquivo);
-
-      const response = await fetch(`${API_URL}/api/documentos`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) throw new Error('Falha ao enviar documento');
-      const novoDocumentoSalvo = await response.json();
-      
-      onSave(novoDocumentoSalvo);
-      onClose();
-    } catch (error) {
-      console.error('Erro no upload:', error);
-      alert('Aviso: Falha ao conectar com o backend. Salvando localmente.');
-      onSave({
-        id: Math.random().toString(36).substring(7),
-        titulo,
-        resumo,
-        categoria: categoriaFinal,
-        enviadoPor: 'Admin',
-        dataCriacao: new Date().toISOString(),
-      });
-      onClose();
+    } catch (err) {
+      console.warn('Falha ao buscar empresas no modal, aplicando fallback.');
+      const fallback = [
+        { id: '1', nome: 'Zamix', status: 'Ativo' },
+        { id: '2', nome: 'NetSpeed', status: 'Ativo' },
+      ];
+      setEmpresasAtivas(fallback);
+      setEmpresaRestrita('Zamix');
     } finally {
-      setIsSubmitting(false);
+      setLoadingEmpresas(false);
     }
   };
 
+  if (!isOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const novoDoc = {
+      id: Date.now().toString(),
+      titulo,
+      descricao,
+      categoria,
+      nivelAcesso,
+      visibilidade: regraVisibilidade,
+      empresaRestrita: regraVisibilidade === 'restrita' ? empresaRestrita : null,
+      nomeArquivo: arquivo ? arquivo.name : 'documento.pdf',
+      tamanhoArquivo: arquivo ? `${(arquivo.size / 1024 / 1024).toFixed(1)} MB` : '1.2 MB',
+      dataEnvio: new Date().toLocaleDateString('pt-BR'),
+      enviadoPor: 'Admin',
+    };
+
+    onSave(novoDoc);
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm transition-opacity font-sans">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="px-6 py-4 border-b border-gray-100 flex justify-between bg-gray-50/50">
+    <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 font-sans selection:bg-orange-100 selection:text-orange-900">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto border border-gray-100">
+        <div className="p-6 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
           <h2 className="text-lg font-bold text-gray-900">Cadastrar Novo Documento</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">✕</button>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 p-1 rounded-lg transition-colors"
+          >
+            ✕
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5 text-sm">
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
           <div>
-            <label className="block font-semibold text-gray-700 mb-1">Título do Documento *</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Título do Documento *</label>
             <input
               type="text"
+              required
               value={titulo}
               onChange={(e) => setTitulo(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
               placeholder="Ex: Planos e Tarifas Q3"
-              required
+              className="w-full border border-gray-200 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
             />
           </div>
 
           <div>
-            <label className="block font-semibold text-gray-700 mb-1">Resumo / Descrição curta</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Resumo / Descrição curta</label>
             <textarea
-              value={resumo}
-              onChange={(e) => setResumo(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none resize-none"
-              rows={2}
+              rows={3}
+              value={descricao}
+              onChange={(e) => setDescricao(e.target.value)}
               placeholder="Descreva brevemente o conteúdo deste documento..."
+              className="w-full border border-gray-200 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <div className="flex justify-between items-center mb-1">
-                <label className="font-semibold text-gray-700">Categoria *</label>
-                <button
-                  type="button"
-                  onClick={() => setCriandoCategoria(!criandoCategoria)}
-                  className="text-xs text-orange-600 font-bold hover:underline"
-                >
-                  {criandoCategoria ? 'Selecionar existente' : '+ Nova Categoria'}
-                </button>
-              </div>
-              {criandoCategoria ? (
-                <input
-                  type="text"
-                  value={novaCategoria}
-                  onChange={(e) => setNovaCategoria(e.target.value)}
-                  placeholder="Nome da nova categoria..."
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                  required
-                />
-              ) : (
-                <select
-                  value={categoria}
-                  onChange={(e) => setCategoria(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none bg-white"
-                >
-                  <option value="Manuais">Manuais</option>
-                  <option value="Contratos e Termos">Contratos e Termos</option>
-                  <option value="Guias Técnicos">Guias Técnicos</option>
-                  <option value="Material Comercial">Material Comercial</option>
-                </select>
-              )}
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Categoria *</label>
+              <select
+                value={categoria}
+                onChange={(e) => setCategoria(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white font-medium"
+              >
+                <option value="Manuais">Manuais</option>
+                <option value="Contratos e Termos">Contratos e Termos</option>
+                <option value="Guias Técnicos">Guias Técnicos</option>
+                <option value="Material Comercial">Material Comercial</option>
+              </select>
             </div>
 
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Nível de Acesso</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Nível de Acesso</label>
               <select
                 value={nivelAcesso}
                 onChange={(e) => setNivelAcesso(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none bg-white"
+                className="w-full border border-gray-200 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white font-medium"
               >
                 <option value="Partner (Todos)">Partner (Todos)</option>
-                <option value="Master">Master</option>
-                <option value="Admin">Admin</option>
+                <option value="Apenas Admins">Apenas Admins</option>
               </select>
             </div>
           </div>
 
-          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-3">
-            <label className="block font-semibold text-gray-700">Regra de Visibilidade por Empresa</label>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 cursor-pointer font-medium text-gray-700">
+          {/* Regra de Visibilidade com Picklist de Empresas */}
+          <div className="bg-gray-50/70 p-4 rounded-xl border border-gray-200/80 space-y-3">
+            <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider">
+              Regra de Visibilidade por Empresa
+            </label>
+            
+            <div className="flex items-center gap-6">
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-gray-700">
                 <input
                   type="radio"
                   name="visibilidade"
-                  value="publica"
-                  checked={visibilidade === 'publica'}
-                  onChange={(e) => setVisibilidade(e.target.value)}
+                  checked={regraVisibilidade === 'publica'}
+                  onChange={() => setRegraVisibilidade('publica')}
                   className="text-orange-600 focus:ring-orange-500"
                 />
                 Pública (Todas as empresas)
               </label>
-              <label className="flex items-center gap-2 cursor-pointer font-medium text-gray-700">
+
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-gray-700">
                 <input
                   type="radio"
                   name="visibilidade"
-                  value="restrita"
-                  checked={visibilidade === 'restrita'}
-                  onChange={(e) => setVisibilidade(e.target.value)}
+                  checked={regraVisibilidade === 'restrita'}
+                  onChange={() => setRegraVisibilidade('restrita')}
                   className="text-orange-600 focus:ring-orange-500"
                 />
                 Restrita a uma Empresa
               </label>
             </div>
 
-            {visibilidade === 'restrita' && (
-              <input
-                type="text"
-                value={empresa}
-                onChange={(e) => setEmpresa(e.target.value)}
-                placeholder="Nome da empresa parceira..."
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none bg-white"
-                required
-              />
+            {regraVisibilidade === 'restrita' && (
+              <div className="pt-2">
+                {loadingEmpresas ? (
+                  <div className="text-xs text-gray-400 py-2">Carregando lista de parceiros ativos...</div>
+                ) : empresasAtivas.length > 0 ? (
+                  <select
+                    value={empresaRestrita}
+                    onChange={(e) => setEmpresaRestrita(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white font-medium text-gray-900"
+                  >
+                    {empresasAtivas.map((emp) => (
+                      <option key={emp.id} value={emp.nome}>
+                        {emp.nome}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-xs text-amber-700 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
+                    Nenhuma empresa parceira com contrato ativo cadastrada no momento.
+                  </p>
+                )}
+              </div>
             )}
           </div>
 
           <div>
-            <label className="block font-semibold text-gray-700 mb-2">Upload do Arquivo *</label>
-            <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:bg-orange-50 transition-all relative">
-              <input
-                type="file"
-                accept=".pdf"
-                onChange={(e) => setArquivo(e.target.files?.[0] || null)}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                required
-              />
-              <span className="font-medium text-gray-600">
-                {arquivo ? `✅ ${arquivo.name}` : '📁 Arraste um PDF ou clique aqui'}
-              </span>
-            </div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Upload do Arquivo *</label>
+            <input
+              type="file"
+              onChange={(e) => setArquivo(e.target.files?.[0] || null)}
+              className="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 border border-gray-200 rounded-lg cursor-pointer"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 text-xs font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors shadow-sm"
+            >
+              Salvar Documento
+            </button>
           </div>
         </form>
-
-        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50/50">
-          <button type="button" onClick={onClose} className="px-4 py-2 font-medium text-gray-700 hover:bg-gray-100 rounded-lg">
-            Cancelar
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="px-6 py-2 font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors shadow-sm"
-          >
-            {isSubmitting ? 'Enviando...' : 'Salvar Documento'}
-          </button>
-        </div>
       </div>
     </div>
   );

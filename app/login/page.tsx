@@ -25,40 +25,47 @@ export default function LoginPage() {
   // Lista de empresas parceiras ativas
   const [empresasAtivas, setEmpresasAtivas] = useState<EmpresaAtiva[]>([]);
 
-  // URL da API
   const API_URL = 'https://api-iez-partner-hub.onrender.com';
 
-  // Busca parceiros ativos para popular a lista suspensa (Picklist)
   useEffect(() => {
-    async function fetchEmpresasAtivas() {
-      setLoadingEmpresas(true);
-      try {
-        const res = await fetch(`${API_URL}/api/empresas`);
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            // Regra de Negócio: Filtra apenas empresas com contrato "Ativo"
-            const ativas = data.filter((emp: EmpresaAtiva) => emp.status === 'Ativo');
-            setEmpresasAtivas(ativas);
-            if (ativas.length > 0) {
-              setEmpresa(ativas[0].nome);
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('Servidor indisponível para carregar parceiros ativos. Usando fallback local.');
-        const fallbackAtivas: EmpresaAtiva[] = [{ id: '1', nome: 'NetSpeed' }];
-        setEmpresasAtivas(fallbackAtivas);
-        setEmpresa('NetSpeed');
-      } finally {
-        setLoadingEmpresas(false);
-      }
-    }
-
     fetchEmpresasAtivas();
   }, []);
 
-  // --- Função de LOGIN ---
+  const fetchEmpresasAtivas = async () => {
+    setLoadingEmpresas(true);
+    try {
+      const res = await fetch(`${API_URL}/api/empresas`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          // Normalizador tolerante a caixa alta/baixa e nomes de propriedades
+          const ativas = data
+            .map((emp: any) => ({
+              id: String(emp.id),
+              nome: emp.nome || emp.name || 'Empresa Sem Nome',
+              status: emp.status || 'Ativo',
+            }))
+            .filter((emp) => emp.status.toString().toLowerCase() === 'ativo');
+
+          setEmpresasAtivas(ativas);
+          if (ativas.length > 0) {
+            setEmpresa(ativas[0].nome);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Servidor indisponível, aplicando fallback de empresas ativas.');
+      const fallback = [
+        { id: '1', nome: 'Zamix', status: 'Ativo' },
+        { id: '2', nome: 'NetSpeed', status: 'Ativo' },
+      ];
+      setEmpresasAtivas(fallback);
+      setEmpresa('Zamix');
+    } fontually {
+      setLoadingEmpresas(false);
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -98,7 +105,6 @@ export default function LoginPage() {
     }
   };
 
-  // --- Função de CADASTRO ---
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -125,7 +131,6 @@ export default function LoginPage() {
 
       setMessage({ type: 'success', text: 'Cadastro realizado com sucesso! Aguardando aprovação.' });
 
-      // Limpa os campos após sucesso
       setNome('');
       setSenha('');
       setPerfil('USER');
@@ -146,16 +151,14 @@ export default function LoginPage() {
     setIsRegister(!isRegister);
     setMessage(null);
     setSenha('');
-    if (empresasAtivas.length > 0 && !empresa) {
-      setEmpresa(empresasAtivas[0].nome);
+    if (!isRegister) {
+      fetchEmpresasAtivas();
     }
   };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4 font-sans selection:bg-orange-100 selection:text-orange-900">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-100 p-8 relative">
-        
-        {/* Cabeçalho do Formulário */}
         <div className="flex flex-col items-center mb-8">
           <div className="relative w-28 h-10 mb-4">
             <Image
@@ -174,7 +177,6 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Mensagens de Feedback */}
         {message && (
           <div className={`mb-6 p-4 rounded-lg text-sm text-center font-medium ${
             message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
@@ -183,9 +185,7 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Formulário Principal */}
         <form onSubmit={isRegister ? handleRegister : handleLogin} className="space-y-4">
-          
           {isRegister && (
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1.5">Nome Completo *</label>
@@ -193,7 +193,7 @@ export default function LoginPage() {
                 type="text"
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all"
+                className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
                 required
               />
             </div>
@@ -207,12 +207,11 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all"
+              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
               required
             />
           </div>
 
-          {/* Seleção de Empresa Parceira (Apenas Parceiros com Contrato Ativo) */}
           {isRegister && (
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1.5">
@@ -220,13 +219,13 @@ export default function LoginPage() {
               </label>
               {loadingEmpresas ? (
                 <div className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm bg-gray-50 text-gray-400 font-medium">
-                  Carregando empresas ativas...
+                  Carregando parceiros ativos...
                 </div>
               ) : empresasAtivas.length > 0 ? (
                 <select
                   value={empresa}
                   onChange={(e) => setEmpresa(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all bg-white font-medium text-gray-800"
+                  className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white font-medium text-gray-800"
                   required
                 >
                   {empresasAtivas.map((emp) => (
@@ -258,7 +257,7 @@ export default function LoginPage() {
               type="password"
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all"
+              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
               required
             />
           </div>
@@ -299,13 +298,12 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading || (isRegister && empresasAtivas.length === 0)}
-            className="w-full bg-orange-600 hover:bg-orange-700 active:bg-orange-800 text-white font-bold py-3 px-4 rounded-lg transition-colors mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-lg transition-colors mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Aguarde...' : isRegister ? 'Finalizar Solicitação' : 'Entrar no Portal'}
           </button>
         </form>
 
-        {/* Rodapé e Alternância */}
         <div className="mt-8 text-center border-t border-gray-100 pt-6">
           <p className="text-sm text-gray-500">
             {isRegister ? (
