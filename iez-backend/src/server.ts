@@ -6,7 +6,6 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 
-// Carrega as variáveis de ambiente (.env)
 dotenv.config();
 
 const app = express();
@@ -14,9 +13,13 @@ const prisma = new PrismaClient();
 const PORT = process.env.PORT || 5000;
 
 // ==========================================
-// CONFIGURAÇÃO DE UPLOAD (MULTER)
+// CONFIGURAÇÃO DE PASTA E MULTER (ROBUSTO)
 // ==========================================
-const uploadDir = path.join(__dirname, '../uploads');
+// Garante o caminho correto tanto em ambiente dev quanto após build
+const uploadDir = process.env.NODE_ENV === 'production' 
+  ? path.join('/tmp', 'uploads')
+  : path.join(__dirname, '..', 'uploads');
+
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -30,18 +33,16 @@ const storage = multer.diskStorage({
     cb(null, `${Date.now()}-${safeName}`);
   }
 });
+
 const upload = multer({ storage });
 
 // ==========================================
 // MIDDLEWARES
 // ==========================================
-app.use(
-  cors({
-    origin: '*', 
-    credentials: true,
-  })
-);
+app.use(cors({ origin: '*', credentials: true }));
 app.use(express.json());
+
+// Servidor de arquivos estáticos configurado com fallback explícito
 app.use('/uploads', express.static(uploadDir));
 
 // ==========================================
@@ -103,7 +104,7 @@ app.post('/api/solicitacoes', async (req: Request, res: Response): Promise<void>
   }
 });
 
-// --- Rota de Documentos (Listagem com Resumo) ---
+// --- Listagem Geral de Documentos ---
 app.get('/api/documentos', async (req: Request, res: Response): Promise<void> => {
   try {
     const documentos = await prisma.documento.findMany({
@@ -126,14 +127,11 @@ app.get('/api/documentos', async (req: Request, res: Response): Promise<void> =>
   }
 });
 
-// --- ROTA DE DETALHES DO DOCUMENTO (POR ID) ---
+// --- Detalhes do Documento por ID ---
 app.get('/api/documentos/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-
-    const doc = await prisma.documento.findUnique({
-      where: { id }
-    });
+    const doc = await prisma.documento.findUnique({ where: { id } });
 
     if (!doc) {
       res.status(404).json({ message: 'Documento não encontrado no banco de dados.' });
@@ -151,12 +149,11 @@ app.get('/api/documentos/:id', async (req: Request, res: Response): Promise<void
       secoes: []
     });
   } catch (error) {
-    console.error('Erro ao buscar documento por ID:', error);
-    res.status(500).json({ message: 'Erro interno ao buscar o documento.' });
+    res.status(500).json({ message: 'Erro interno ao buscar documento por ID.' });
   }
 });
 
-// --- CRIAÇÃO DE NOVO DOCUMENTO (COM RESUMO E EMPRESA) ---
+// --- Upload de Novo Documento ---
 app.post('/api/documentos', upload.single('file'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { titulo, resumo, categoria, nivelAcesso, visibilidade, empresa } = req.body;
@@ -195,7 +192,7 @@ app.post('/api/documentos', upload.single('file'), async (req: Request, res: Res
   }
 });
 
-// --- EDIÇÃO DE DOCUMENTO (INCLUINDO RESUMO) ---
+// --- Edição In-line de Documento ---
 app.put('/api/documentos/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
@@ -213,33 +210,19 @@ app.put('/api/documentos/:id', async (req: Request, res: Response): Promise<void
   }
 });
 
-// --- Rota de Gestão de Acessos (Listar Usuários) ---
+// --- Gestão de Usuários ---
 app.get('/api/usuarios', async (req: Request, res: Response): Promise<void> => {
   try {
     const usuarios = await prisma.usuario.findMany({
-      orderBy: [
-        { status: 'asc' }, 
-        { criadoEm: 'desc' }
-      ],
-      select: {
-        id: true,
-        nome: true,
-        email: true,
-        role: true,
-        empresa: true,
-        status: true,
-        criadoEm: true
-      }
+      orderBy: [{ status: 'asc' }, { criadoEm: 'desc' }],
+      select: { id: true, nome: true, email: true, role: true, empresa: true, status: true, criadoEm: true }
     });
-
     res.status(200).json(usuarios);
   } catch (error) {
-    console.error('[USUARIOS ERRO] Erro ao buscar usuários:', error);
     res.status(500).json({ message: 'Erro ao buscar lista de usuários.' });
   }
 });
 
-// --- Rota de Gestão de Acessos (Alterar Status) ---
 app.put('/api/usuarios/:id/status', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
@@ -257,14 +240,10 @@ app.put('/api/usuarios/:id/status', async (req: Request, res: Response): Promise
 
     res.status(200).json({ message: 'Acesso atualizado com sucesso!', usuario: usuarioAtualizado });
   } catch (error) {
-    console.error('[GESTAO ERRO] Erro ao atualizar usuário:', error);
     res.status(500).json({ message: 'Erro ao atualizar status do usuário.' });
   }
 });
 
-// ==========================================
-// INICIALIZAÇÃO
-// ==========================================
 process.on('SIGINT', async () => { await prisma.$disconnect(); process.exit(0); });
 process.on('SIGTERM', async () => { await prisma.$disconnect(); process.exit(0); });
 
