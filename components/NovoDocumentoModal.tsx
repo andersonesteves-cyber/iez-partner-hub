@@ -1,155 +1,101 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-
-interface Empresa {
-  id: string;
-  nome: string;
-  name?: string;
-  status: string;
-}
+import { useState, useRef } from 'react';
+import { Documento } from './DocumentosManager';
 
 interface NovoDocumentoModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (documento: any) => void;
+  onSave: (doc: Documento) => void;
 }
 
 export default function NovoDocumentoModal({ isOpen, onClose, onSave }: NovoDocumentoModalProps) {
   const [titulo, setTitulo] = useState('');
-  const [descricao, setDescricao] = useState('');
   const [categoria, setCategoria] = useState('Manuais');
-  const [nivelAcesso, setNivelAcesso] = useState('Partner (Todos)');
-  const [regraVisibilidade, setRegraVisibilidade] = useState<'publica' | 'restrita'>('publica');
-  const [empresaRestrita, setEmpresaRestrita] = useState('');
+  const [resumo, setResumo] = useState('');
+  const [visibilidade, setVisibilidade] = useState('geral');
+  const [empresa, setEmpresa] = useState('');
   const [arquivo, setArquivo] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [empresasAtivas, setEmpresasAtivas] = useState<Empresa[]>([]);
-  const [loadingEmpresas, setLoadingEmpresas] = useState(false);
-
-  const API_URL = 'https://api-iez-partner-hub.onrender.com';
-
-  const aplicarFallback = () => {
-    const fallbackList = [
-      { id: '1', nome: 'Zamix', status: 'Ativo' },
-      { id: '2', nome: 'NetSpeed', status: 'Ativo' },
-    ];
-    setEmpresasAtivas(fallbackList);
-    setEmpresaRestrita(fallbackList[0].nome);
-  };
-
-  useEffect(() => {
-    if (isOpen) {
-      fetchEmpresas();
-    }
-  }, [isOpen]);
-
-  const fetchEmpresas = async () => {
-    setLoadingEmpresas(true);
-    try {
-      const res = await fetch(`${API_URL}/api/empresas`);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          const ativas = data
-            .map((e: any) => ({
-              id: String(e.id),
-              nome: e.nome || e.name || 'Empresa Sem Nome',
-              status: String(e.status || 'Ativo'),
-            }))
-            .filter((e) => e.status.toLowerCase() === 'ativo');
-
-          if (ativas.length > 0) {
-            setEmpresasAtivas(ativas);
-            setEmpresaRestrita(ativas[0].nome);
-          } else {
-            aplicarFallback();
-          }
-        } else {
-          aplicarFallback();
-        }
-      } else {
-        aplicarFallback();
-      }
-    } catch (err) {
-      console.warn('Falha na comunicação com a API. Aplicando empresas padrão.');
-      aplicarFallback();
-    } finally {
-      setLoadingEmpresas(false);
-    }
-  };
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!arquivo) {
+      alert('Por favor, selecione um arquivo PDF.');
+      return;
+    }
 
-    const novoDoc = {
-      id: Date.now().toString(),
-      titulo,
-      descricao,
-      categoria,
-      nivelAcesso,
-      visibilidade: regraVisibilidade,
-      empresaRestrita: regraVisibilidade === 'restrita' ? empresaRestrita : null,
-      nomeArquivo: arquivo ? arquivo.name : 'documento.pdf',
-      tamanhoArquivo: arquivo ? `${(arquivo.size / 1024 / 1024).toFixed(1)} MB` : '1.2 MB',
-      dataEnvio: new Date().toLocaleDateString('pt-BR'),
-      enviadoPor: 'Admin',
-    };
+    setIsSubmitting(true);
 
-    onSave(novoDoc);
-    onClose();
+    try {
+      // Usamos FormData porque estamos enviando um arquivo físico (multipart/form-data)
+      const formData = new FormData();
+      formData.append('titulo', titulo);
+      formData.append('categoria', categoria);
+      formData.append('resumo', resumo);
+      formData.append('visibilidade', visibilidade);
+      if (visibilidade === 'restrita') {
+        formData.append('empresa', empresa);
+      }
+      formData.append('file', arquivo);
+
+      // Dispara a requisição POST real para a API no Render
+      const response = await fetch(`${API_URL}/api/documentos`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Falha ao salvar no banco de dados.');
+      }
+
+      const novoDocumento = await response.json();
+      
+      // Envia o documento retornado pelo backend (com ID real do banco) para a tela
+      onSave(novoDocumento);
+      
+      // Limpa o form e fecha
+      setTitulo('');
+      setResumo('');
+      setCategoria('Manuais');
+      setVisibilidade('geral');
+      setEmpresa('');
+      setArquivo(null);
+      onClose();
+
+    } catch (error) {
+      console.error('Erro no upload:', error);
+      alert('Erro ao enviar documento. Verifique a conexão com a API.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 font-sans selection:bg-orange-100 selection:text-orange-900">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto border border-gray-100">
-        
-        {/* CABEÇALHO DO MODAL */}
-        <div className="p-6 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
-          <h2 className="text-lg font-bold text-gray-900">Cadastrar Novo Documento</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 p-1 rounded-lg transition-colors"
-          >
+    <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+          <h2 className="text-lg font-bold text-gray-900">Novo Documento</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             ✕
           </button>
         </div>
 
-        {/* FORMULÁRIO */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">Título do Documento *</label>
-            <input
-              type="text"
-              required
-              value={titulo}
-              onChange={(e) => setTitulo(e.target.value)}
-              placeholder="Ex: Planos e Tarifas Q3"
-              className="w-full border border-gray-200 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">Resumo / Descrição curta</label>
-            <textarea
-              rows={3}
-              value={descricao}
-              onChange={(e) => setDescricao(e.target.value)}
-              placeholder="Descreva brevemente o conteúdo deste documento..."
-              className="w-full border border-gray-200 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="p-6 overflow-y-auto">
+          <form id="doc-form" onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Categoria *</label>
-              <select
-                value={categoria}
-                onChange={(e) => setCategoria(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white font-medium"
-              >
+              <label className="block text-sm font-bold text-gray-700 mb-1">Título do Documento *</label>
+              <input required type="text" value={titulo} onChange={(e) => setTitulo(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all text-sm" placeholder="Ex: Manual de Instalação V2" />
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Categoria *</label>
+              <select value={categoria} onChange={(e) => setCategoria(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-white">
                 <option value="Manuais">Manuais</option>
                 <option value="Contratos e Termos">Contratos e Termos</option>
                 <option value="Guias Técnicos">Guias Técnicos</option>
@@ -158,95 +104,62 @@ export default function NovoDocumentoModal({ isOpen, onClose, onSave }: NovoDocu
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Nível de Acesso</label>
-              <select
-                value={nivelAcesso}
-                onChange={(e) => setNivelAcesso(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white font-medium"
-              >
-                <option value="Partner (Todos)">Partner (Todos)</option>
-                <option value="Apenas Admins">Apenas Admins</option>
-              </select>
-            </div>
-          </div>
-
-          {/* VISIBILIDADE POR EMPRESA */}
-          <div className="bg-gray-50/70 p-4 rounded-xl border border-gray-200/80 space-y-3">
-            <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider">
-              Regra de Visibilidade por Empresa
-            </label>
-            
-            <div className="flex items-center gap-6">
-              <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-gray-700">
-                <input
-                  type="radio"
-                  name="visibilidade"
-                  checked={regraVisibilidade === 'publica'}
-                  onChange={() => setRegraVisibilidade('publica')}
-                  className="text-orange-600 focus:ring-orange-500"
-                />
-                Pública (Todas as empresas)
-              </label>
-
-              <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-gray-700">
-                <input
-                  type="radio"
-                  name="visibilidade"
-                  checked={regraVisibilidade === 'restrita'}
-                  onChange={() => setRegraVisibilidade('restrita')}
-                  className="text-orange-600 focus:ring-orange-500"
-                />
-                Restrita a uma Empresa
-              </label>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Resumo (Opcional)</label>
+              <textarea value={resumo} onChange={(e) => setResumo(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none text-sm resize-none" placeholder="Breve descrição sobre o arquivo..." />
             </div>
 
-            {/* SELEÇÃO DA EMPRESA */}
-            {regraVisibilidade === 'restrita' && (
-              <div className="pt-2">
-                {loadingEmpresas ? (
-                  <div className="text-xs text-gray-400 py-2">Carregando lista de parceiros ativos...</div>
-                ) : (
-                  <select
-                    value={empresaRestrita}
-                    onChange={(e) => setEmpresaRestrita(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white font-medium text-gray-900"
-                  >
-                    {empresasAtivas.map((emp) => (
-                      <option key={emp.id} value={emp.nome}>
-                        {emp.nome}
-                      </option>
-                    ))}
-                  </select>
-                )}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Visibilidade</label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input type="radio" name="visibilidade" value="geral" checked={visibilidade === 'geral'} onChange={(e) => setVisibilidade(e.target.value)} className="text-orange-600 focus:ring-orange-500" />
+                  Público (Todos os parceiros)
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input type="radio" name="visibilidade" value="restrita" checked={visibilidade === 'restrita'} onChange={(e) => setVisibilidade(e.target.value)} className="text-orange-600 focus:ring-orange-500" />
+                  Restrito a uma Empresa
+                </label>
+              </div>
+            </div>
+
+            {visibilidade === 'restrita' && (
+              <div className="p-4 bg-orange-50 rounded-lg border border-orange-100">
+                <label className="block text-sm font-bold text-gray-700 mb-1 text-orange-900">Nome da Empresa Parceira *</label>
+                <input required={visibilidade === 'restrita'} type="text" value={empresa} onChange={(e) => setEmpresa(e.target.value)} className="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none text-sm" placeholder="Ex: Zamix" />
               </div>
             )}
-          </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">Upload do Arquivo *</label>
-            <input
-              type="file"
-              onChange={(e) => setArquivo(e.target.files?.[0] || null)}
-              className="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 border border-gray-200 rounded-lg cursor-pointer"
-            />
-          </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Arquivo (PDF) *</label>
+              <div 
+                className="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-gray-50 transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input required type="file" accept="application/pdf" className="hidden" ref={fileInputRef} onChange={(e) => setArquivo(e.target.files?.[0] || null)} />
+                <svg className="w-8 h-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                {arquivo ? (
+                  <span className="text-sm font-bold text-orange-600 truncate max-w-[200px]">{arquivo.name}</span>
+                ) : (
+                  <>
+                    <span className="text-sm text-gray-600 font-medium">Clique para selecionar</span>
+                    <span className="text-xs text-gray-400 mt-1">Apenas PDF (Máx 10MB)</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </form>
+        </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 text-xs font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors shadow-sm"
-            >
-              Salvar Documento
-            </button>
-          </div>
-        </form>
+        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-200 rounded-lg transition-colors">
+            Cancelar
+          </button>
+          <button type="submit" form="doc-form" disabled={isSubmitting} className="px-6 py-2 text-sm font-bold text-white bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-sm transition-colors flex items-center gap-2">
+            {isSubmitting ? 'Salvando...' : 'Salvar Documento'}
+          </button>
+        </div>
       </div>
     </div>
   );
