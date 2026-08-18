@@ -4,229 +4,135 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import NovoDocumentoModal from './NovoDocumentoModal';
 
-interface Documento {
+export interface Documento {
   id: string;
   titulo: string;
-  descricao: string;
   categoria: string;
-  visibilidade?: 'publica' | 'restrita';
-  empresaRestrita?: string;
+  resumo?: string;
   enviadoPor?: string;
-  dataEnvio?: string;
+  dataCriacao?: string;
+  pdfUrl?: string;
+  regraVisibilidade?: string; // NOVO CAMPO ADICIONADO AQUI
 }
 
 interface DocumentosManagerProps {
-  categoriaUrl?: string;
   searchQuery?: string;
 }
 
-export default function DocumentosManager({
-  categoriaUrl = '',
-  searchQuery = '',
-}: DocumentosManagerProps) {
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [documentoExcluir, setDocumentoExcluir] = useState<Documento | null>(null);
+export default function DocumentosManager({ searchQuery = '' }: DocumentosManagerProps) {
+  const [documentos, setDocumentos] = useState<Documento[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const [documentos, setDocumentos] = useState<Documento[]>([
-    {
-      id: '1',
-      titulo: 'Manual de Vendas e Atendimento',
-      descricao: 'Insumos e diretrizes comerciais para atuação em campo.',
-      categoria: 'Manuais',
-      enviadoPor: 'Admin iez!',
-      dataEnvio: '17/08/2026',
-    },
-    {
-      id: '2',
-      titulo: 'Apresentação Go-To-Market',
-      descricao: 'Guia completo de estratégia comercial e lançamento.',
-      categoria: 'Material Comercial',
-      enviadoPor: 'Admin iez!',
-      dataEnvio: '17/08/2026',
-    },
-    {
-      id: '3',
-      titulo: 'Guia Técnico de Integrações',
-      descricao: 'Documentação de APIs e configurações para ISPs parceiros.',
-      categoria: 'Guias Técnicos',
-      enviadoPor: 'Admin iez!',
-      dataEnvio: '17/08/2026',
-    },
-  ]);
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('iez_user') || localStorage.getItem('user');
-    if (storedUser) {
-      try {
-        setCurrentUser(JSON.parse(storedUser));
-      } catch (e) {}
-    }
-
-    const salvos = localStorage.getItem('iez_documentos');
-    if (salvos) {
-      try {
-        setDocumentos(JSON.parse(salvos));
-      } catch (e) {}
-    }
-  }, []);
-
-  const userRole = currentUser?.role?.toUpperCase() || 'USER';
-  const userEmpresa = currentUser?.empresa || currentUser?.company || '';
-  const isAdmin = ['ADMIN', 'IEZ_ADMIN', 'COMPANY_ADMIN'].includes(userRole);
-  const isIezAdmin = ['ADMIN', 'IEZ_ADMIN'].includes(userRole);
-
-  const handleSalvarNovoDocumento = (novoDoc: Documento) => {
-    const atualizados = [novoDoc, ...documentos];
-    setDocumentos(atualizados);
-    localStorage.setItem('iez_documentos', JSON.stringify(atualizados));
-  };
-
-  const handleConfirmarExclusao = () => {
-    if (!documentoExcluir) return;
-    const atualizados = documentos.filter((d) => d.id !== documentoExcluir.id);
-    setDocumentos(atualizados);
-    localStorage.setItem('iez_documentos', JSON.stringify(atualizados));
-    setDocumentoExcluir(null);
-  };
+    fetch(`${API_URL}/api/documentos`)
+      .then((res) => res.json())
+      .then((data) => setDocumentos(data))
+      .catch((err) => console.error('Falha na API', err))
+      .finally(() => setIsLoading(false));
+  }, [API_URL]);
 
   const documentosFiltrados = documentos.filter((doc) => {
-    const termo = searchQuery.toLowerCase();
-    const matchesSearch =
-      !termo ||
-      doc.titulo.toLowerCase().includes(termo) ||
-      doc.descricao.toLowerCase().includes(termo) ||
-      doc.categoria.toLowerCase().includes(termo);
-
-    const matchesCategoria =
-      !categoriaUrl || doc.categoria.toLowerCase().includes(categoriaUrl.toLowerCase());
-
-    if (isIezAdmin) return matchesSearch && matchesCategoria;
-    if (doc.visibilidade === 'restrita') {
-      return (
-        matchesSearch &&
-        matchesCategoria &&
-        doc.empresaRestrita?.toLowerCase() === userEmpresa.toLowerCase()
-      );
-    }
-
-    return matchesSearch && matchesCategoria;
+    const query = searchQuery.toLowerCase();
+    return doc.titulo.toLowerCase().includes(query) || doc.categoria.toLowerCase().includes(query);
   });
 
-  return (
-    <div className="space-y-6 font-sans selection:bg-orange-100 selection:text-orange-900">
-      
-      {/* CABEÇALHO DO ACERVO COM O BOTÃO + NOVO DOCUMENTO */}
-      <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Acervo de Documentos</h1>
-          <p className="text-xs text-gray-500 mt-1">
-            Consulte e gerencie os manuais, termos e insumos da iez! telecom.
-          </p>
-        </div>
+  const handleAdicionarDocumento = (novoDoc: Documento) => {
+    setDocumentos((prev) => [novoDoc, ...prev]);
+    setIsModalOpen(false);
+  };
 
-        {isAdmin && (
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 active:bg-orange-800 text-white font-bold text-xs px-4 py-3 rounded-xl shadow-sm transition-all"
-          >
-            <span>+</span> Novo Documento
-          </button>
-        )}
+  const handleExcluir = async (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    if(confirm('Tem certeza que deseja excluir este documento?')) {
+      // Simula exclusão no frontend (até criarmos a rota DELETE no backend)
+      setDocumentos(prev => prev.filter(doc => doc.id !== id));
+      alert('Documento excluído (simulação).');
+    }
+  };
+
+  if (isLoading) {
+    return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div></div>;
+  }
+
+  return (
+    <div className="space-y-8 font-sans">
+      <div className="flex justify-between items-center bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+        <div>
+          <h2 className="text-2xl font-extrabold text-gray-900">Acervo de Documentos</h2>
+          <p className="text-sm text-gray-500 mt-1">Consulte e gerencie os manuais, termos e insumos da iez! telecom.</p>
+        </div>
+        <button onClick={() => setIsModalOpen(true)} className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2.5 px-6 rounded-lg shadow-md hover:shadow-lg transition-all flex items-center gap-2 text-sm">
+          + Novo Documento
+        </button>
       </div>
 
-      {/* GRID DE CARDS */}
-      {documentosFiltrados.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
-          <p className="text-sm font-semibold text-gray-500">
-            Nenhum documento encontrado para os filtros selecionados.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {documentosFiltrados.map((doc) => (
-            <div
-              key={doc.id}
-              className="bg-white p-5 rounded-2xl border border-gray-100 hover:border-orange-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between relative group"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 bg-orange-50 px-2.5 py-1 rounded-md">
-                    {doc.categoria}
-                  </span>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {documentosFiltrados.map((doc) => {
+          // Extrai o nome da empresa se for RESTRITA:NomeDaEmpresa
+          const isRestrito = doc.regraVisibilidade?.startsWith('RESTRITA');
+          const empresaRestrita = isRestrito ? doc.regraVisibilidade?.split(':')[1] : '';
 
-                  {isAdmin && (
-                    <button
-                      onClick={() => setDocumentoExcluir(doc)}
-                      title="Excluir arquivo"
-                      className="text-gray-300 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
-                    >
-                      🗑️
+          return (
+            <div key={doc.id} className="relative group">
+              <Link href={`/documento/${doc.id}`} className="block h-full">
+                <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-lg transition-all duration-300 h-full flex flex-col justify-between">
+                  
+                  {/* HEADER DO CARD */}
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex flex-col gap-2">
+                      <span className="inline-flex w-fit items-center bg-orange-50 text-orange-600 text-[10px] font-bold px-2.5 py-1 rounded-md border border-orange-100 uppercase tracking-wider">
+                        {doc.categoria}
+                      </span>
+                      
+                      {/* CADEADO DE EMPRESA RESTRITA */}
+                      {isRestrito && (
+                        <span className="inline-flex w-fit items-center gap-1 bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded-md border border-gray-200 truncate max-w-[150px]">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          </svg>
+                          {empresaRestrita || 'Restrito'}
+                        </span>
+                      )}
+                    </div>
+                    
+                    <button onClick={(e) => handleExcluir(e, doc.id)} className="text-gray-300 hover:text-red-500 transition-colors p-1">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
                     </button>
-                  )}
+                  </div>
+
+                  {/* CORPO DO CARD */}
+                  <div className="mb-6">
+                    <h3 className="font-extrabold text-gray-900 text-lg leading-tight mb-2 group-hover:text-orange-600 transition-colors">
+                      {doc.titulo}
+                    </h3>
+                    <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed">
+                      {doc.resumo || "Documento sem descrição."}
+                    </p>
+                  </div>
+                  
+                  {/* FOOTER DO CARD */}
+                  <div className="mt-auto border-t border-gray-100 pt-4 flex items-center justify-between">
+                    <span className="text-xs font-medium text-gray-400">
+                      {doc.enviadoPor || "Admin iez!"}
+                    </span>
+                    <span className="text-xs font-bold text-orange-600 group-hover:underline">
+                      Acessar arquivo →
+                    </span>
+                  </div>
+
                 </div>
-
-                <h3 className="text-base font-bold text-gray-900 group-hover:text-orange-600 transition-colors">
-                  {doc.titulo}
-                </h3>
-
-                <p className="text-xs text-gray-500 mt-2 line-clamp-2 leading-relaxed">
-                  {doc.descricao || 'Sem descrição cadastrada.'}
-                </p>
-              </div>
-
-              <div className="mt-6 pt-3 border-t border-gray-50 flex items-center justify-between text-xs">
-                <span className="text-[11px] text-gray-400 font-medium">
-                  {doc.enviadoPor || 'Admin'}
-                </span>
-
-                <Link
-                  href={`/documento/${doc.id}`}
-                  className="text-orange-600 font-bold hover:text-orange-700 transition-colors"
-                >
-                  Acessar arquivo →
-                </Link>
-              </div>
+              </Link>
             </div>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
 
-      {/* MODAL DE NOVO DOCUMENTO */}
-      <NovoDocumentoModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSave={handleSalvarNovoDocumento}
-      />
-
-      {/* MODAL DE EXCLUSÃO */}
-      {documentoExcluir && (
-        <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 border border-gray-100 text-center">
-            <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-xl font-bold mx-auto mb-4">
-              🗑️
-            </div>
-            <h2 className="text-base font-bold text-gray-900 mb-2">Excluir Documento?</h2>
-            <p className="text-xs text-gray-500 leading-relaxed mb-6">
-              Deseja remover o arquivo <strong className="text-gray-800">{documentoExcluir.titulo}</strong> do acervo público?
-            </p>
-            <div className="flex justify-center gap-3">
-              <button
-                onClick={() => setDocumentoExcluir(null)}
-                className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-lg"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleConfirmarExclusao}
-                className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm"
-              >
-                Confirmar Exclusão
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <NovoDocumentoModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleAdicionarDocumento} />
     </div>
   );
 }
