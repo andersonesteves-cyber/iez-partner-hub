@@ -4,7 +4,13 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 
-export default function Sidebar() {
+// Adicionamos a interface para o TypeScript parar de reclamar no AuthGuard
+interface SidebarProps {
+  isMobileOpen?: boolean;
+  onClose?: () => void;
+}
+
+export default function Sidebar({ isMobileOpen, onClose }: SidebarProps) {
   const searchParams = useSearchParams();
   const currentQuery = searchParams.get('q');
 
@@ -20,16 +26,27 @@ export default function Sidebar() {
     <aside className="w-64 bg-white border-r border-gray-200 flex flex-col h-screen sticky top-0 font-sans">
       {/* LOGO E HOME */}
       <div className="p-6 flex flex-col gap-8">
-        <Link href="/" className="block px-2">
-          <Image 
-            src="/iez-logo-oficial.png" 
-            alt="iez! telecom logo" 
-            width={140} 
-            height={48} 
-            className="object-contain"
-            priority
-          />
-        </Link>
+        
+        <div className="flex justify-between items-center">
+          <Link href="/" className="block px-2">
+            <Image 
+              src="/iez-logo-oficial.png" 
+              alt="iez! telecom logo" 
+              width={140} 
+              height={48} 
+              className="object-contain"
+              priority
+            />
+          </Link>
+          {/* Botão de fechar visível apenas no mobile, usando a prop onClose */}
+          {onClose && (
+            <button onClick={onClose} className="md:hidden text-gray-400 hover:text-orange-600 p-1">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
 
         {/* BOTÃO HOME */}
         <Link 
@@ -55,7 +72,6 @@ export default function Sidebar() {
         <nav className="space-y-0.5 mb-8">
           {categorias.map((cat) => {
             const href = cat.param ? `/?q=${cat.param}` : '/';
-            // Lógica ajustada para o 'Todos os Documentos' não ficar ativo quando outra categoria estiver
             const isActive = cat.param === '' ? currentQuery === null : currentQuery === cat.param;
 
             return (
