@@ -114,6 +114,9 @@ app.post('/api/solicitacoes', async (req: Request, res: Response): Promise<void>
 });
 
 // ==========================================
+// ROTAS DE DOCUMENTOS 
+// ==========================================
+
 // --- ROTA DE LISTAGEM DE DOCUMENTOS ---
 app.get('/api/documentos', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -126,7 +129,7 @@ app.get('/api/documentos', async (req: Request, res: Response): Promise<void> =>
       titulo: doc.titulo,
       resumo: doc.resumo || '',
       categoria: doc.categoria,
-      nivelAcesso: doc.nivelAcesso || 'Partner (Todos)', // DEVOLVENDO NIVEL DE ACESSO
+      nivelAcesso: doc.nivelAcesso || 'Partner (Todos)',
       pdfUrl: doc.arquivoUrl,
       regraVisibilidade: doc.regraVisibilidade, 
       dataCriacao: doc.atualizadoEm.toISOString(),
@@ -136,6 +139,34 @@ app.get('/api/documentos', async (req: Request, res: Response): Promise<void> =>
     res.status(200).json(docsFormatados);
   } catch (error) {
     res.status(500).json({ message: 'Erro ao buscar documentos.' });
+  }
+});
+
+// --- ROTA DE DETALHES DO DOCUMENTO POR ID ---
+app.get('/api/documentos/:id', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const doc = await prisma.documento.findUnique({ where: { id } });
+
+    if (!doc) {
+      res.status(404).json({ message: 'Documento não encontrado no banco de dados.' });
+      return;
+    }
+
+    res.status(200).json({
+      id: doc.id,
+      titulo: doc.titulo,
+      resumo: doc.resumo || '',
+      categoria: doc.categoria,
+      nivelAcesso: doc.nivelAcesso || 'Partner (Todos)',
+      pdfUrl: doc.arquivoUrl,
+      regraVisibilidade: doc.regraVisibilidade, 
+      dataCriacao: doc.atualizadoEm.toISOString(),
+      enviadoPor: doc.enviadoPor || 'Admin iez!',
+      secoes: []
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Erro interno ao buscar o documento.' });
   }
 });
 
@@ -158,7 +189,7 @@ app.post('/api/documentos', upload.single('file'), async (req: Request, res: Res
         titulo,
         resumo: resumo || '',
         categoria,
-        nivelAcesso: nivelAcesso || 'Partner (Todos)', // SALVANDO NO BANCO
+        nivelAcesso: nivelAcesso || 'Partner (Todos)',
         regraVisibilidade: regraFormatada, 
         arquivoUrl,
         enviadoPor: 'Admin iez!'
@@ -181,6 +212,47 @@ app.post('/api/documentos', upload.single('file'), async (req: Request, res: Res
     res.status(500).json({ message: 'Erro ao salvar o documento.' });
   }
 });
+
+// --- ROTA DE EDIÇÃO DE DOCUMENTO (PUT) ---
+app.put('/api/documentos/:id', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { titulo, categoria, resumo, nivelAcesso, regraVisibilidade } = req.body;
+
+    const documentoAtualizado = await prisma.documento.update({
+      where: { id },
+      data: {
+        titulo,
+        categoria,
+        resumo,
+        nivelAcesso,
+        regraVisibilidade
+      }
+    });
+
+    res.status(200).json(documentoAtualizado);
+  } catch (error) {
+    console.error('Erro ao atualizar documento:', error);
+    res.status(500).json({ message: 'Erro ao atualizar o documento.' });
+  }
+});
+
+// --- ROTA DE EXCLUSÃO DE DOCUMENTO (DELETE) ---
+app.delete('/api/documentos/:id', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    await prisma.documento.delete({
+      where: { id }
+    });
+
+    res.status(200).json({ message: 'Documento excluído com sucesso.' });
+  } catch (error) {
+    console.error('Erro na exclusão:', error);
+    res.status(500).json({ message: 'Erro ao excluir o documento.' });
+  }
+});
+
 // ==========================================
 // ROTAS DE USUÁRIOS
 // ==========================================
@@ -229,7 +301,6 @@ let empresasMock = [
 
 app.get('/api/empresas', async (req: Request, res: Response): Promise<void> => {
   try {
-    // Checagem segura para evitar erros se o model 'company' ainda não existir no schema
     if ('company' in prisma) {
       const dbEmpresas = await (prisma as any).company.findMany({ orderBy: { name: 'asc' } });
       if (dbEmpresas.length > 0) {

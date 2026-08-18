@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import NovoDocumentoModal from './NovoDocumentoModal';
+import EditarDocumentoModal from './EditarDocumentoModal';
 
 export interface Documento {
   id: string;
   titulo: string;
   categoria: string;
   resumo?: string;
-  nivelAcesso?: string; // NOVO CAMPO
+  nivelAcesso?: string;
   enviadoPor?: string;
   dataCriacao?: string;
   pdfUrl?: string;
@@ -23,7 +24,14 @@ interface DocumentosManagerProps {
 export default function DocumentosManager({ searchQuery = '' }: DocumentosManagerProps) {
   const [documentos, setDocumentos] = useState<Documento[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [documentoEdicao, setDocumentoEdicao] = useState<Documento | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Simulação do usuário logado no portal (Futuro Auth Context)
+  const usuarioLogado = {
+    role: 'ADMIN', // 'ADMIN' ou 'GESTOR'
+    empresa: 'iez! telecom',
+  };
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
@@ -45,6 +53,13 @@ export default function DocumentosManager({ searchQuery = '' }: DocumentosManage
     setIsModalOpen(false);
   };
 
+  const handleSalvarEdicao = (docAtualizado: Documento) => {
+    setDocumentos((prev) =>
+      prev.map((doc) => (doc.id === docAtualizado.id ? docAtualizado : doc))
+    );
+    setDocumentoEdicao(null);
+  };
+
   const handleExcluir = async (e: React.MouseEvent, id: string) => {
     e.preventDefault();
 
@@ -64,6 +79,20 @@ export default function DocumentosManager({ searchQuery = '' }: DocumentosManage
         alert('Falha na comunicação com a API.');
       }
     }
+  };
+
+  // Regra de validação de permissão para abrir a edição
+  const podeEditarDocumento = (doc: Documento) => {
+    if (usuarioLogado.role === 'ADMIN') return true; // Admin iez! edita tudo
+    
+    if (usuarioLogado.role === 'GESTOR') {
+      const isRestrito = doc.regraVisibilidade?.startsWith('RESTRITA');
+      if (!isRestrito) return true; // Gestor iez! edita gerais da iez!
+      const empresaRestrita = doc.regraVisibilidade?.split(':')[1];
+      return empresaRestrita === usuarioLogado.empresa;
+    }
+
+    return false;
   };
 
   if (isLoading) {
@@ -93,26 +122,24 @@ export default function DocumentosManager({ searchQuery = '' }: DocumentosManage
         {documentosFiltrados.map((doc) => {
           const isRestrito = doc.regraVisibilidade?.startsWith('RESTRITA');
           const empresaRestrita = isRestrito ? doc.regraVisibilidade?.split(':')[1] : '';
+          const podeEditar = podeEditarDocumento(doc);
 
           return (
             <div key={doc.id} className="relative group">
               <Link href={`/documento/${doc.id}`} className="block h-full">
                 <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-lg transition-all duration-300 h-full flex flex-col justify-between">
                   
-                  {/* HEADER DO CARD COM AS TAGS */}
+                  {/* HEADER DO CARD */}
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex flex-wrap gap-1.5">
-                      {/* Categoria */}
                       <span className="inline-flex w-fit items-center bg-orange-50 text-orange-600 text-[10px] font-bold px-2.5 py-1 rounded-md border border-orange-100 uppercase tracking-wider">
                         {doc.categoria}
                       </span>
 
-                      {/* Perfil de Usuário */}
                       <span className="inline-flex w-fit items-center bg-gray-100 text-gray-700 text-[10px] font-bold px-2.5 py-1 rounded-md border border-gray-200">
                         👤 {doc.nivelAcesso || 'Partner (Todos)'}
                       </span>
 
-                      {/* Cadeado da Empresa */}
                       {isRestrito && (
                         <span className="inline-flex w-fit items-center gap-1 bg-amber-50 text-amber-700 text-[10px] font-bold px-2 py-1 rounded-md border border-amber-200 truncate max-w-[150px]">
                           🔒 {empresaRestrita || 'Restrito'}
@@ -120,15 +147,34 @@ export default function DocumentosManager({ searchQuery = '' }: DocumentosManage
                       )}
                     </div>
 
-                    <button
-                      onClick={(e) => handleExcluir(e, doc.id)}
-                      title="Excluir arquivo"
-                      className="text-gray-300 hover:text-red-500 transition-colors p-1 relative z-10"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
+                    {/* BOTÕES DE AÇÃO (EDITAR E EXCLUIR) */}
+                    <div className="flex items-center gap-1 relative z-10">
+                      {podeEditar && (
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setDocumentoEdicao(doc);
+                          }}
+                          title="Editar documento"
+                          className="text-gray-300 hover:text-orange-600 transition-colors p-1 rounded-md hover:bg-orange-50"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </button>
+                      )}
+
+                      <button
+                        onClick={(e) => handleExcluir(e, doc.id)}
+                        title="Excluir arquivo"
+                        className="text-gray-300 hover:text-red-500 transition-colors p-1 rounded-md hover:bg-red-50"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+
                   </div>
 
                   {/* CORPO DO CARD */}
@@ -158,6 +204,13 @@ export default function DocumentosManager({ searchQuery = '' }: DocumentosManage
       </div>
 
       <NovoDocumentoModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleAdicionarDocumento} />
+      
+      <EditarDocumentoModal
+        isOpen={!!documentoEdicao}
+        documento={documentoEdicao}
+        onClose={() => setDocumentoEdicao(null)}
+        onSave={handleSalvarEdicao}
+      />
     </div>
   );
 }
