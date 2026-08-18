@@ -1,134 +1,119 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
-interface Secao {
-  id: string;
-  titulo: string;
-  conteudo: string;
-}
-
-interface Documento {
-  id: string;
-  titulo: string;
-  categoria: string;
-  pdfUrl: string;
-  resumo?: string;
-  secoes?: Secao[];
-}
-
-export default function DocumentoReaderPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-  const [doc, setDoc] = useState<Documento | null>(null);
-  const [secaoAtiva, setSecaoAtiva] = useState<string>('');
-  const [modoView, setModoView] = useState<'leitura' | 'pdf'>('pdf');
+export default function DocumentoDetalhes({ params }: { params: { id: string } }) {
+  const [documento, setDocumento] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const router = useRouter();
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
   useEffect(() => {
-    setIsLoading(true);
-    fetch(`${API_URL}/api/documentos/${id}`)
-      .then((res) => {
-        if (!res.ok) throw new Error('Documento não encontrado');
-        return res.json();
-      })
-      .then((data: Documento) => {
-        setDoc(data);
-        if (data.secoes && data.secoes.length > 0) {
-          setSecaoAtiva(data.secoes[0].id);
-          setModoView('leitura');
+    const fetchDocumento = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/documentos/${params.id}`);
+        
+        if (!response.ok) {
+          throw new Error('Documento não encontrado no banco de dados.');
         }
-      })
-      .catch((err) => {
-        console.error('Erro ao buscar documento:', err);
-      })
-      .finally(() => {
+
+        const data = await response.json();
+        setDocumento(data);
+      } catch (err: any) {
+        console.error(err);
+        setError(err.message);
+      } finally {
         setIsLoading(false);
-      });
-  }, [id, API_URL]);
+      }
+    };
+
+    fetchDocumento();
+  }, [API_URL, params.id]);
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center font-sans">
-        <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-600"></div>
-          <p className="text-sm font-medium text-gray-500">Carregando documento do iez! Hub...</p>
-        </div>
+      <div className="flex justify-center items-center h-[70vh]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-orange-600"></div>
       </div>
     );
   }
 
-  if (!doc) {
+  if (error || !documento) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center font-sans">
-        <div className="text-center bg-white p-8 rounded-xl border border-gray-200 shadow-sm max-w-md">
-          <h1 className="text-xl font-bold text-gray-900 mb-2">Documento não encontrado</h1>
-          <p className="text-sm text-gray-500 mb-6">O arquivo solicitado não foi localizado no servidor.</p>
-          <Link href="/" className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2.5 px-5 rounded-lg text-sm transition-colors">
-            ← Voltar para o início
-          </Link>
-        </div>
+      <div className="flex flex-col items-center justify-center py-32 space-y-4">
+        <div className="text-4xl">📄</div>
+        <h2 className="text-xl font-bold text-gray-900">Documento indisponível</h2>
+        <p className="text-sm text-gray-500">O arquivo pode ter sido excluído ou você não tem permissão.</p>
+        <Link href="/" className="mt-4 bg-orange-100 text-orange-600 px-6 py-2 rounded-lg font-bold hover:bg-orange-200 transition-colors">
+          Voltar para o Acervo
+        </Link>
       </div>
     );
   }
 
-  // Concatena explicitamente a URL do Render quando o caminho retornado é relativo (/uploads/...)
-  const fullPdfUrl = doc.pdfUrl.startsWith('http') ? doc.pdfUrl : `${API_URL}${doc.pdfUrl}`;
+  // Garante que o iframe e o download apontem para o Render e não para a Vercel
+  const fullPdfUrl = documento.pdfUrl?.startsWith('http') 
+    ? documento.pdfUrl 
+    : `${API_URL}${documento.pdfUrl}`;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col font-sans text-gray-800">
-      <header className="sticky top-0 z-20 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="text-sm font-semibold text-gray-500 hover:text-orange-600 transition-colors flex items-center gap-1">
-            ← Voltar para Início
-          </Link>
-          <span className="text-gray-300">|</span>
-          <h1 className="text-lg font-bold text-gray-900">{doc.titulo}</h1>
-          <span className="bg-orange-50 text-orange-600 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-orange-200">
-            {doc.categoria}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="bg-gray-100 p-1 rounded-lg flex gap-1 border border-gray-200">
-            <button
-              onClick={() => setModoView('leitura')}
-              disabled={!doc.secoes || doc.secoes.length === 0}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                modoView === 'leitura' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-gray-900 disabled:opacity-40 disabled:cursor-not-allowed'
-              }`}
-            >
-              Leitura Adaptativa
-            </button>
-            <button
-              onClick={() => setModoView('pdf')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                modoView === 'pdf' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              PDF Original
-            </button>
-          </div>
-
-          <a
-            href={fullPdfUrl}
-            download
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+    <div className="space-y-6 font-sans h-[calc(100vh-100px)] flex flex-col">
+      
+      {/* CABEÇALHO DO LEITOR */}
+      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0">
+        <div className="flex items-center gap-4 w-full sm:w-auto">
+          <button 
+            onClick={() => router.push('/')} 
+            className="text-sm font-medium text-gray-400 hover:text-orange-600 transition-colors flex items-center gap-1"
           >
-            📥 Baixar PDF
-          </a>
+            <span>←</span> Voltar
+          </button>
+          <div className="h-6 w-px bg-gray-200"></div>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <h1 className="text-lg font-bold text-gray-900 truncate max-w-md" title={documento.titulo}>
+              {documento.titulo}
+            </h1>
+            <span className="inline-flex w-fit bg-orange-50 text-orange-600 text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider">
+              {documento.categoria}
+            </span>
+          </div>
         </div>
-      </header>
 
-      <div className="flex flex-1 max-w-7xl w-full mx-auto p-6 gap-6">
-        <main className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm min-h-[75vh] overflow-hidden p-2">
-          <iframe src={`${fullPdfUrl}#toolbar=0`} className="w-full h-full min-h-[75vh] rounded-lg border-none" title={doc.titulo} />
-        </main>
+        <a 
+          href={fullPdfUrl} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2.5 px-6 rounded-lg shadow-sm transition-colors text-sm flex items-center gap-2 w-full sm:w-auto justify-center"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Baixar PDF Original
+        </a>
       </div>
+
+      {/* LEITOR DE PDF (IFRAME) */}
+      <div className="flex-1 bg-gray-100 rounded-xl border border-gray-200 overflow-hidden relative shadow-inner">
+        {documento.pdfUrl ? (
+          <iframe 
+            src={`${fullPdfUrl}#view=FitH`} // O #view=FitH faz o PDF abrir preenchendo a largura
+            className="w-full h-full border-none"
+            title={`Leitor do documento ${documento.titulo}`}
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3">
+            <svg className="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span className="font-medium">Nenhum arquivo PDF anexado a este registro.</span>
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }
