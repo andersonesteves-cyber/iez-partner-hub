@@ -99,7 +99,7 @@ app.post('/api/solicitacoes', async (req: Request, res: Response): Promise<void>
 });
 
 // ==========================================
-// ROTAS DE DOCUMENTOS (COM CORREÇÕES DO PASSO 1)
+// ROTAS DE DOCUMENTOS 
 // ==========================================
 app.get('/api/documentos', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -113,7 +113,7 @@ app.get('/api/documentos', async (req: Request, res: Response): Promise<void> =>
       resumo: doc.resumo || '',
       categoria: doc.categoria,
       pdfUrl: doc.arquivoUrl,
-      regraVisibilidade: doc.regraVisibilidade, // Retornando para o Front (Cadeado)
+      regraVisibilidade: doc.regraVisibilidade, 
       dataCriacao: doc.atualizadoEm.toISOString(),
       enviadoPor: doc.enviadoPor || 'Admin iez!'
     }));
@@ -140,7 +140,7 @@ app.get('/api/documentos/:id', async (req: Request, res: Response): Promise<void
       resumo: doc.resumo || '',
       categoria: doc.categoria,
       pdfUrl: doc.arquivoUrl,
-      regraVisibilidade: doc.regraVisibilidade, // Retornando para o Front
+      regraVisibilidade: doc.regraVisibilidade, 
       dataCriacao: doc.atualizadoEm.toISOString(),
       enviadoPor: doc.enviadoPor || 'Admin iez!',
       secoes: []
@@ -160,7 +160,6 @@ app.post('/api/documentos', upload.single('file'), async (req: Request, res: Res
     }
 
     const arquivoUrl = `/uploads/${arquivo.filename}`;
-    // Formata a regra de visibilidade corretamente
     const regraFormatada = visibilidade === 'restrita' ? `RESTRITA:${empresa || ''}` : 'GERAL';
 
     const novoDocumento = await prisma.documento.create({
@@ -169,7 +168,7 @@ app.post('/api/documentos', upload.single('file'), async (req: Request, res: Res
         resumo: resumo || '',
         categoria,
         nivelAcesso: nivelAcesso || 'Partner (Todos)',
-        regraVisibilidade: regraFormatada, // Salvando no banco
+        regraVisibilidade: regraFormatada, 
         arquivoUrl,
         enviadoPor: 'Admin iez!'
       }
@@ -181,7 +180,7 @@ app.post('/api/documentos', upload.single('file'), async (req: Request, res: Res
       resumo: novoDocumento.resumo,
       categoria: novoDocumento.categoria,
       pdfUrl: novoDocumento.arquivoUrl,
-      regraVisibilidade: novoDocumento.regraVisibilidade, // Retornando
+      regraVisibilidade: novoDocumento.regraVisibilidade, 
       dataCriacao: novoDocumento.atualizadoEm.toISOString(),
       enviadoPor: novoDocumento.enviadoPor
     });
@@ -244,7 +243,7 @@ app.put('/api/usuarios/:id/status', async (req: Request, res: Response): Promise
 });
 
 // ==========================================
-// ROTAS DE EMPRESAS (NOVO SNIPPET INCLUÍDO)
+// ROTAS DE EMPRESAS
 // ==========================================
 let empresasMock = [
   { id: '1', nome: 'Zamix', name: 'Zamix', status: 'Ativo', createdAt: new Date().toISOString() },
@@ -307,4 +306,9 @@ app.post('/api/empresas', async (req: Request, res: Response): Promise<void> => 
 // ==========================================
 // INICIALIZAÇÃO E GRACEFUL SHUTDOWN
 // ==========================================
-process.on('SIGINT', async () => { await prisma.$disconnect(); process
+process.on('SIGINT', async () => { await prisma.$disconnect(); process.exit(0); });
+process.on('SIGTERM', async () => { await prisma.$disconnect(); process.exit(0); });
+
+app.listen(PORT, () => {
+  console.log(`[IEZ! BACKEND] Servidor rodando na porta ${PORT}`);
+});
