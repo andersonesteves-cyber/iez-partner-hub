@@ -114,8 +114,7 @@ app.post('/api/solicitacoes', async (req: Request, res: Response): Promise<void>
 });
 
 // ==========================================
-// ROTAS DE DOCUMENTOS 
-// ==========================================
+// --- ROTA DE LISTAGEM DE DOCUMENTOS ---
 app.get('/api/documentos', async (req: Request, res: Response): Promise<void> => {
   try {
     const documentos = await prisma.documento.findMany({
@@ -127,6 +126,7 @@ app.get('/api/documentos', async (req: Request, res: Response): Promise<void> =>
       titulo: doc.titulo,
       resumo: doc.resumo || '',
       categoria: doc.categoria,
+      nivelAcesso: doc.nivelAcesso || 'Partner (Todos)', // DEVOLVENDO NIVEL DE ACESSO
       pdfUrl: doc.arquivoUrl,
       regraVisibilidade: doc.regraVisibilidade, 
       dataCriacao: doc.atualizadoEm.toISOString(),
@@ -139,32 +139,7 @@ app.get('/api/documentos', async (req: Request, res: Response): Promise<void> =>
   }
 });
 
-app.get('/api/documentos/:id', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const doc = await prisma.documento.findUnique({ where: { id } });
-
-    if (!doc) {
-      res.status(404).json({ message: 'Documento não encontrado no banco de dados.' });
-      return;
-    }
-
-    res.status(200).json({
-      id: doc.id,
-      titulo: doc.titulo,
-      resumo: doc.resumo || '',
-      categoria: doc.categoria,
-      pdfUrl: doc.arquivoUrl,
-      regraVisibilidade: doc.regraVisibilidade, 
-      dataCriacao: doc.atualizadoEm.toISOString(),
-      enviadoPor: doc.enviadoPor || 'Admin iez!',
-      secoes: []
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Erro interno ao buscar o documento.' });
-  }
-});
-
+// --- ROTA DE CRIAÇÃO DE DOCUMENTOS ---
 app.post('/api/documentos', upload.single('file'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { titulo, resumo, categoria, nivelAcesso, visibilidade, empresa } = req.body;
@@ -183,7 +158,7 @@ app.post('/api/documentos', upload.single('file'), async (req: Request, res: Res
         titulo,
         resumo: resumo || '',
         categoria,
-        nivelAcesso: nivelAcesso || 'Partner (Todos)',
+        nivelAcesso: nivelAcesso || 'Partner (Todos)', // SALVANDO NO BANCO
         regraVisibilidade: regraFormatada, 
         arquivoUrl,
         enviadoPor: 'Admin iez!'
@@ -195,6 +170,7 @@ app.post('/api/documentos', upload.single('file'), async (req: Request, res: Res
       titulo: novoDocumento.titulo,
       resumo: novoDocumento.resumo,
       categoria: novoDocumento.categoria,
+      nivelAcesso: novoDocumento.nivelAcesso,
       pdfUrl: novoDocumento.arquivoUrl,
       regraVisibilidade: novoDocumento.regraVisibilidade, 
       dataCriacao: novoDocumento.atualizadoEm.toISOString(),
@@ -205,38 +181,6 @@ app.post('/api/documentos', upload.single('file'), async (req: Request, res: Res
     res.status(500).json({ message: 'Erro ao salvar o documento.' });
   }
 });
-
-app.put('/api/documentos/:id', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const { titulo, categoria, resumo } = req.body;
-
-    const documentoAtualizado = await prisma.documento.update({
-      where: { id },
-      data: { titulo, categoria, resumo }
-    });
-
-    res.status(200).json(documentoAtualizado);
-  } catch (error) {
-    res.status(500).json({ message: 'Erro ao atualizar o documento.' });
-  }
-});
-
-app.delete('/api/documentos/:id', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-
-    await prisma.documento.delete({
-      where: { id }
-    });
-
-    res.status(200).json({ message: 'Documento excluído com sucesso.' });
-  } catch (error) {
-    console.error('Erro na exclusão:', error);
-    res.status(500).json({ message: 'Erro ao excluir o documento.' });
-  }
-});
-
 // ==========================================
 // ROTAS DE USUÁRIOS
 // ==========================================

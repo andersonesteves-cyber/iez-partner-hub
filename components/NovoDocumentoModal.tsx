@@ -19,7 +19,8 @@ export default function NovoDocumentoModal({ isOpen, onClose, onSave }: NovoDocu
   const [titulo, setTitulo] = useState('');
   const [categoria, setCategoria] = useState('Manuais');
   const [resumo, setResumo] = useState('');
-  const [visibilidade, setVisibilidade] = useState('geral'); // 'geral' ou 'restrita'
+  const [nivelAcesso, setNivelAcesso] = useState('Partner (Todos)'); // NOVO CAMPO
+  const [visibilidade, setVisibilidade] = useState('geral');
   const [empresaSelecionada, setEmpresaSelecionada] = useState('');
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [arquivo, setArquivo] = useState<File | null>(null);
@@ -30,7 +31,6 @@ export default function NovoDocumentoModal({ isOpen, onClose, onSave }: NovoDocu
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
-  // Carrega as empresas reais cadastradas na API ao abrir o modal
   useEffect(() => {
     if (isOpen) {
       setIsLoadingEmpresas(true);
@@ -70,6 +70,7 @@ export default function NovoDocumentoModal({ isOpen, onClose, onSave }: NovoDocu
       formData.append('titulo', titulo);
       formData.append('categoria', categoria);
       formData.append('resumo', resumo);
+      formData.append('nivelAcesso', nivelAcesso); // Enviando o nível de acesso
       formData.append('visibilidade', visibilidade);
       if (visibilidade === 'restrita') {
         formData.append('empresa', empresaSelecionada);
@@ -89,10 +90,10 @@ export default function NovoDocumentoModal({ isOpen, onClose, onSave }: NovoDocu
       
       onSave(novoDocumento);
       
-      // Reset do formulário
       setTitulo('');
       setResumo('');
       setCategoria('Manuais');
+      setNivelAcesso('Partner (Todos)');
       setVisibilidade('geral');
       setEmpresaSelecionada('');
       setArquivo(null);
@@ -125,7 +126,7 @@ export default function NovoDocumentoModal({ isOpen, onClose, onSave }: NovoDocu
         </div>
 
         {/* CORPO DO FORMULÁRIO */}
-        <div className="p-6 overflow-y-auto">
+        <div className="p-6 overflow-y-auto space-y-5">
           <form id="doc-form" onSubmit={handleSubmit} className="space-y-5">
             
             {/* TÍTULO */}
@@ -143,21 +144,39 @@ export default function NovoDocumentoModal({ isOpen, onClose, onSave }: NovoDocu
               />
             </div>
 
-            {/* CATEGORIA */}
-            <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                Categoria *
-              </label>
-              <select 
-                value={categoria} 
-                onChange={(e) => setCategoria(e.target.value)} 
-                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-600 outline-none text-sm font-medium text-gray-900 bg-white cursor-pointer"
-              >
-                <option value="Manuais">Manuais</option>
-                <option value="Contratos e Termos">Contratos e Termos</option>
-                <option value="Guias Técnicos">Guias Técnicos</option>
-                <option value="Material Comercial">Material Comercial</option>
-              </select>
+            {/* GRID: CATEGORIA E NÍVEL DE USUÁRIO */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                  Categoria *
+                </label>
+                <select 
+                  value={categoria} 
+                  onChange={(e) => setCategoria(e.target.value)} 
+                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-600 outline-none text-sm font-medium text-gray-900 bg-white cursor-pointer"
+                >
+                  <option value="Manuais">Manuais</option>
+                  <option value="Contratos e Termos">Contratos e Termos</option>
+                  <option value="Guias Técnicos">Guias Técnicos</option>
+                  <option value="Material Comercial">Material Comercial</option>
+                </select>
+              </div>
+
+              {/* PICKLIST DE PERFIL/NÍVEL DE USUÁRIO */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                  Perfil de Usuário *
+                </label>
+                <select 
+                  value={nivelAcesso} 
+                  onChange={(e) => setNivelAcesso(e.target.value)} 
+                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-600 outline-none text-sm font-medium text-gray-900 bg-white cursor-pointer"
+                >
+                  <option value="Partner (Todos)">Partner (Todos)</option>
+                  <option value="Gestor / Supervisor">Gestor / Supervisor</option>
+                  <option value="Apenas Administradores">Apenas Administradores</option>
+                </select>
+              </div>
             </div>
 
             {/* RESUMO */}
@@ -177,7 +196,7 @@ export default function NovoDocumentoModal({ isOpen, onClose, onSave }: NovoDocu
             {/* REGRAS DE VISIBILIDADE / ACESSO */}
             <div>
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                Nível de Acesso e Visibilidade *
+                Escopo de Visibilidade *
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <label 
@@ -218,7 +237,7 @@ export default function NovoDocumentoModal({ isOpen, onClose, onSave }: NovoDocu
               </div>
             </div>
 
-            {/* PICKLIST DE EMPRESA (VISÍVEL APENAS QUANDO RESTRITO) */}
+            {/* PICKLIST DE EMPRESA */}
             {visibilidade === 'restrita' && (
               <div className="p-4 bg-orange-50/60 rounded-xl border border-orange-100 space-y-2">
                 <label className="block text-xs font-bold text-orange-900 uppercase tracking-wider">

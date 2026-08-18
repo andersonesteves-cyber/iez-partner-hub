@@ -9,6 +9,7 @@ export interface Documento {
   titulo: string;
   categoria: string;
   resumo?: string;
+  nivelAcesso?: string; // NOVO CAMPO
   enviadoPor?: string;
   dataCriacao?: string;
   pdfUrl?: string;
@@ -26,7 +27,6 @@ export default function DocumentosManager({ searchQuery = '' }: DocumentosManage
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
-  // Busca os dados APENAS da API no Render (sem localstorage ou mocks)
   useEffect(() => {
     fetch(`${API_URL}/api/documentos`)
       .then((res) => res.json())
@@ -40,7 +40,6 @@ export default function DocumentosManager({ searchQuery = '' }: DocumentosManage
     return doc.titulo.toLowerCase().includes(query) || doc.categoria.toLowerCase().includes(query);
   });
 
-  // Atualiza a lista instantaneamente com o retorno REAL do backend
   const handleAdicionarDocumento = (novoDoc: Documento) => {
     setDocumentos((prev) => [novoDoc, ...prev]);
     setIsModalOpen(false);
@@ -100,18 +99,23 @@ export default function DocumentosManager({ searchQuery = '' }: DocumentosManage
               <Link href={`/documento/${doc.id}`} className="block h-full">
                 <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-lg transition-all duration-300 h-full flex flex-col justify-between">
                   
+                  {/* HEADER DO CARD COM AS TAGS */}
                   <div className="flex justify-between items-start mb-4">
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-wrap gap-1.5">
+                      {/* Categoria */}
                       <span className="inline-flex w-fit items-center bg-orange-50 text-orange-600 text-[10px] font-bold px-2.5 py-1 rounded-md border border-orange-100 uppercase tracking-wider">
                         {doc.categoria}
                       </span>
 
+                      {/* Perfil de Usuário */}
+                      <span className="inline-flex w-fit items-center bg-gray-100 text-gray-700 text-[10px] font-bold px-2.5 py-1 rounded-md border border-gray-200">
+                        👤 {doc.nivelAcesso || 'Partner (Todos)'}
+                      </span>
+
+                      {/* Cadeado da Empresa */}
                       {isRestrito && (
-                        <span className="inline-flex w-fit items-center gap-1 bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded-md border border-gray-200 truncate max-w-[150px]">
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                          </svg>
-                          {empresaRestrita || 'Restrito'}
+                        <span className="inline-flex w-fit items-center gap-1 bg-amber-50 text-amber-700 text-[10px] font-bold px-2 py-1 rounded-md border border-amber-200 truncate max-w-[150px]">
+                          🔒 {empresaRestrita || 'Restrito'}
                         </span>
                       )}
                     </div>
@@ -127,6 +131,7 @@ export default function DocumentosManager({ searchQuery = '' }: DocumentosManage
                     </button>
                   </div>
 
+                  {/* CORPO DO CARD */}
                   <div className="mb-6">
                     <h3 className="font-extrabold text-gray-900 text-lg leading-tight mb-2 group-hover:text-orange-600 transition-colors">
                       {doc.titulo}
@@ -136,6 +141,7 @@ export default function DocumentosManager({ searchQuery = '' }: DocumentosManage
                     </p>
                   </div>
 
+                  {/* FOOTER DO CARD */}
                   <div className="mt-auto border-t border-gray-100 pt-4 flex items-center justify-between">
                     <span className="text-xs font-medium text-gray-400">
                       {doc.enviadoPor || 'Admin iez!'}
