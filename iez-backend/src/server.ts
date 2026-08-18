@@ -13,18 +13,7 @@ const prisma = new PrismaClient();
 const PORT = process.env.PORT || 5000;
 
 // ==========================================
-// CONFIGURAÇÃO DE PASTA E MULTER (ROBUSTO NO RENDER)
-// ==========================================
-const uploadDir = process.env.NODE_ENV === 'production' 
-  ? path.join('/tmp', 'uploads')
-  : path.join(__dirname, '..', 'uploads');
-
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-// ==========================================
-// CONFIGURAÇÃO DE PASTA E MULTER (ROBUSTO NO RENDER)
+// CONFIGURAÇÃO DE PASTA E MULTER (SANITIZAÇÃO E RENDER)
 // ==========================================
 const uploadDir = process.env.NODE_ENV === 'production' 
   ? path.join('/tmp', 'uploads')
@@ -42,20 +31,18 @@ const storage = multer.diskStorage({
     // 1. Corrige o bug nativo do Multer que distorce caracteres UTF-8
     const utf8Name = Buffer.from(file.originalname, 'latin1').toString('utf8');
     
-    // 2. Remove acentos (ex: "reunião" vira "reuniao", "lançamento" vira "lancamento")
+    // 2. Remove acentos e caracteres especiais
     const nameWithoutAccents = utf8Name.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     
-    // 3. Troca qualquer coisa que não seja letra, número ou ponto por um hífen
+    // 3. Troca o que não for letra/número por hífen
     const safeName = nameWithoutAccents
       .replace(/[^a-zA-Z0-9.]/g, '-')
-      .replace(/-+/g, '-') // Remove hifens duplicados
-      .toLowerCase(); // Tudo minúsculo para garantir compatibilidade
+      .replace(/-+/g, '-') 
+      .toLowerCase(); 
       
     cb(null, `${Date.now()}-${safeName}`);
   }
 });
-
-const upload = multer({ storage });
 
 const upload = multer({ storage });
 
