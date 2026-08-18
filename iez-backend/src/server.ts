@@ -23,15 +23,39 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+// ==========================================
+// CONFIGURAÇÃO DE PASTA E MULTER (ROBUSTO NO RENDER)
+// ==========================================
+const uploadDir = process.env.NODE_ENV === 'production' 
+  ? path.join('/tmp', 'uploads')
+  : path.join(__dirname, '..', 'uploads');
+
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    const safeName = file.originalname.replace(/\s+/g, '-');
+    // 1. Corrige o bug nativo do Multer que distorce caracteres UTF-8
+    const utf8Name = Buffer.from(file.originalname, 'latin1').toString('utf8');
+    
+    // 2. Remove acentos (ex: "reunião" vira "reuniao", "lançamento" vira "lancamento")
+    const nameWithoutAccents = utf8Name.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    
+    // 3. Troca qualquer coisa que não seja letra, número ou ponto por um hífen
+    const safeName = nameWithoutAccents
+      .replace(/[^a-zA-Z0-9.]/g, '-')
+      .replace(/-+/g, '-') // Remove hifens duplicados
+      .toLowerCase(); // Tudo minúsculo para garantir compatibilidade
+      
     cb(null, `${Date.now()}-${safeName}`);
   }
 });
+
+const upload = multer({ storage });
 
 const upload = multer({ storage });
 
