@@ -28,13 +28,13 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    // 1. Corrige o bug nativo do Multer que distorce caracteres UTF-8
+    // Corrige bug do Multer com UTF-8
     const utf8Name = Buffer.from(file.originalname, 'latin1').toString('utf8');
     
-    // 2. Remove acentos e caracteres especiais
+    // Remove acentos
     const nameWithoutAccents = utf8Name.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     
-    // 3. Troca o que não for letra/número por hífen
+    // Deixa tudo minúsculo e troca espaços/caracteres por hífen
     const safeName = nameWithoutAccents
       .replace(/[^a-zA-Z0-9.]/g, '-')
       .replace(/-+/g, '-') 
@@ -283,4 +283,64 @@ let empresasMock = [
   { id: '4', nome: 'Conecta Fibra', name: 'Conecta Fibra', status: 'Suspenso', createdAt: new Date().toISOString() },
 ];
 
-app.get('/api/empresas', async (req: Request, res: Response): Promise<void> =>
+app.get('/api/empresas', async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Checagem segura para evitar erros se o model 'company' ainda não existir no schema
+    if ('company' in prisma) {
+      const dbEmpresas = await (prisma as any).company.findMany({ orderBy: { name: 'asc' } });
+      if (dbEmpresas.length > 0) {
+        const formatted = dbEmpresas.map((e: any) => ({
+          id: e.id,
+          nome: e.name || e.nome,
+          name: e.name || e.nome,
+          status: e.status || 'Ativo',
+        }));
+        res.status(200).json(formatted);
+        return;
+      }
+    }
+    res.status(200).json(empresasMock);
+  } catch (error) {
+    res.status(200).json(empresasMock);
+  }
+});
+
+app.post('/api/empresas', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { nome, status } = req.body;
+    if (!nome) {
+      res.status(400).json({ message: 'Nome da empresa é obrigatório.' });
+      return;
+    }
+
+    const novaEmpresa = {
+      id: Date.now().toString(),
+      nome,
+      name: nome,
+      status: status || 'Ativo',
+      createdAt: new Date().toISOString(),
+    };
+
+    empresasMock.unshift(novaEmpresa);
+
+    if ('company' in prisma) {
+      await (prisma as any).company.create({
+        data: { name: nome, status: status || 'Ativo' },
+      });
+    }
+
+    res.status(201).json({ message: 'Empresa cadastrada com sucesso.', empresa: novaEmpresa });
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao cadastrar empresa.' });
+  }
+});
+
+// ==========================================
+// INICIALIZAÇÃO E GRACEFUL SHUTDOWN
+// ==========================================
+process.on('SIGINT', async () => { await prisma.$disconnect(); process.exit(0); });
+process.on('SIGTERM', async () => { await prisma.$disconnect(); process.exit(0); });
+
+app.listen(PORT, () => {
+  console.log(`[IEZ! BACKEND] Servidor rodando na porta ${PORT}`);
+});
