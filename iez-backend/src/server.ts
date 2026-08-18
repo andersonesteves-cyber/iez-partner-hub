@@ -66,17 +66,20 @@ app.post('/api/auth/login', async (req: Request, res: Response): Promise<void> =
     const senha = req.body.senha;
 
     if (!email || !senha) {
-      res.status(400).json({ message: 'E-mail e senha são obrigatórios.' }); return;
+      res.status(400).json({ message: 'E-mail e senha são obrigatórios.' }); 
+      return;
     }
 
     const user = await prisma.usuario.findUnique({ where: { email } });
 
     if (!user || user.senha !== senha) {
-      res.status(401).json({ message: 'E-mail ou senha inválidos.' }); return;
+      res.status(401).json({ message: 'E-mail ou senha inválidos.' }); 
+      return;
     }
 
     if (user.status !== 'ATIVO') {
-      res.status(403).json({ message: `Acesso negado. Seu cadastro está: ${user.status}.` }); return;
+      res.status(403).json({ message: `Acesso negado. Seu cadastro está: ${user.status}.` }); 
+      return;
     }
 
     res.status(200).json({
@@ -95,7 +98,8 @@ app.post('/api/solicitacoes', async (req: Request, res: Response): Promise<void>
 
     const usuarioExistente = await prisma.usuario.findUnique({ where: { email } });
     if (usuarioExistente) {
-      res.status(400).json({ message: 'Este e-mail já possui um cadastro.' }); return;
+      res.status(400).json({ message: 'Este e-mail já possui um cadastro.' }); 
+      return;
     }
 
     const roleFormatada = perfil === 'COMPANY_ADMIN' ? 'ADMIN' : 'PARTNER';
@@ -118,7 +122,7 @@ app.get('/api/documentos', async (req: Request, res: Response): Promise<void> =>
       orderBy: { atualizadoEm: 'desc' }
     });
 
-    const docsFormatados = documentos.map(doc => ({
+    const docsFormatados = documentos.map((doc: any) => ({
       id: doc.id,
       titulo: doc.titulo,
       resumo: doc.resumo || '',
@@ -167,7 +171,8 @@ app.post('/api/documentos', upload.single('file'), async (req: Request, res: Res
     const arquivo = req.file;
 
     if (!arquivo) {
-      res.status(400).json({ message: 'Nenhum arquivo enviado.' }); return;
+      res.status(400).json({ message: 'Nenhum arquivo enviado.' }); 
+      return;
     }
 
     const arquivoUrl = `/uploads/${arquivo.filename}`;
@@ -196,3 +201,86 @@ app.post('/api/documentos', upload.single('file'), async (req: Request, res: Res
       enviadoPor: novoDocumento.enviadoPor
     });
   } catch (error) {
+    console.error('Erro no upload:', error);
+    res.status(500).json({ message: 'Erro ao salvar o documento.' });
+  }
+});
+
+app.put('/api/documentos/:id', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { titulo, categoria, resumo } = req.body;
+
+    const documentoAtualizado = await prisma.documento.update({
+      where: { id },
+      data: { titulo, categoria, resumo }
+    });
+
+    res.status(200).json(documentoAtualizado);
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao atualizar o documento.' });
+  }
+});
+
+app.delete('/api/documentos/:id', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    await prisma.documento.delete({
+      where: { id }
+    });
+
+    res.status(200).json({ message: 'Documento excluído com sucesso.' });
+  } catch (error) {
+    console.error('Erro na exclusão:', error);
+    res.status(500).json({ message: 'Erro ao excluir o documento.' });
+  }
+});
+
+// ==========================================
+// ROTAS DE USUÁRIOS
+// ==========================================
+app.get('/api/usuarios', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const usuarios = await prisma.usuario.findMany({
+      orderBy: [{ status: 'asc' }, { criadoEm: 'desc' }],
+      select: { id: true, nome: true, email: true, role: true, empresa: true, status: true, criadoEm: true }
+    });
+    res.status(200).json(usuarios);
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao buscar lista de usuários.' });
+  }
+});
+
+app.put('/api/usuarios/:id/status', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { status, role } = req.body;
+
+    const dadosAtualizados: any = {};
+    if (status) dadosAtualizados.status = status;
+    if (role) dadosAtualizados.role = role;
+
+    const usuarioAtualizado = await prisma.usuario.update({
+      where: { id },
+      data: dadosAtualizados,
+      select: { id: true, nome: true, status: true, role: true }
+    });
+
+    res.status(200).json({ message: 'Acesso atualizado com sucesso!', usuario: usuarioAtualizado });
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao atualizar status do usuário.' });
+  }
+});
+
+// ==========================================
+// ROTAS DE EMPRESAS
+// ==========================================
+let empresasMock = [
+  { id: '1', nome: 'Zamix', name: 'Zamix', status: 'Ativo', createdAt: new Date().toISOString() },
+  { id: '2', nome: 'NetSpeed', name: 'NetSpeed', status: 'Ativo', createdAt: new Date().toISOString() },
+  { id: '3', nome: 'Telecom S.A.', name: 'Telecom S.A.', status: 'Em Contratação', createdAt: new Date().toISOString() },
+  { id: '4', nome: 'Conecta Fibra', name: 'Conecta Fibra', status: 'Suspenso', createdAt: new Date().toISOString() },
+];
+
+app.get('/api/empresas', async (req: Request, res: Response): Promise<void> =>
